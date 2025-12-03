@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HelpMeOil — Станция</title>
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Custom Style -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- Навигация -->
+<nav class="navbar navbar-dark bg-dark px-3">
+    <a class="navbar-brand" href="index.html">← Назад</a>
+</nav>
+
+<div class="container mt-4">
+
+    <!-- Информация о станции -->
+    <div class="card custom-card mb-4">
+        <div class="card-body">
+            <h3 id="stationName" class="card-title text-light">Загрузка...</h3>
+            <p id="stationDistrict" class="text-secondary">Определение района...</p>
+        </div>
+    </div>
+
+    <!-- Рекомендуемая цена -->
+    <div class="card custom-card mb-4">
+        <div class="card-body">
+            <h4 class="text-light">Рекомендуемая цена</h4>
+            <p id="recommendedPrice" class="text-success fs-3">—</p>
+
+            <p class="text-secondary mb-0">
+                Рассчитано на основе цен конкурентов в выбранном районе.
+            </p>
+        </div>
+    </div>
+
+    <!-- Конкуренты -->
+    <div class="card custom-card mb-4">
+        <div class="card-body">
+            <h4 class="text-light mb-3">Цены конкурентов</h4>
+
+            <div class="table-responsive">
+                <table class="table table-dark table-bordered table-striped align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>АЗС</th>
+                            <th>AI-92</th>
+                            <th>AI-95</th>
+                            <th>AI-95+</th>
+                            <th>AI-98</th>
+                            <th>ДТ</th>
+                            <th>Газ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="competitorsTable">
+                        <!-- JS вставит строки -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Переход к графикам -->
+    <a href="charts.html" class="btn btn-success btn-lg w-100 mb-5">
+        Посмотреть графики и аналитику
+    </a>
+
+</div>
+
+<!-- Скрипты -->
+<script src="js/api.js"></script>
+<script src="js/script.js"></script>
+
+</body>
+</html>

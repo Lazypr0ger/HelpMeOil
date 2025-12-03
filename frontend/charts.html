@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HelpMeOil — Графики</title>
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Custom Style -->
+    <link rel="stylesheet" href="css/style.css">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<nav class="navbar navbar-dark bg-dark px-3">
+    <a class="navbar-brand" href="station.html">← Назад</a>
+</nav>
+
+<div class="container mt-4">
+
+    <h2 class="text-light">Аналитика цен</h2>
+    <p class="text-secondary">Здесь отображается динамика цен конкурентов и средние значения.</p>
+
+    <!-- Выбор вида топлива -->
+    <div class="mb-3">
+        <label class="text-light mb-2">Выберите вид топлива:</label>
+        <select id="fuelSelector" class="form-select bg-dark text-light">
+            <option value="Аи-92">Аи-92</option>
+            <option value="Аи-95">Аи-95</option>
+            <option value="Аи-95+">Аи-95+</option>
+            <option value="Аи-98">Аи-98</option>
+            <option value="ДТ">ДТ</option>
+            <option value="Газ">Газ</option>
+        </select>
+    </div>
+
+    <!-- График: динамика цен выбранного топлива -->
+    <div class="card mb-4 custom-card">
+        <div class="card-body">
+            <h4 class="text-light">Динамика цен</h4>
+            <canvas id="priceChart" height="120"></canvas>
+        </div>
+    </div>
+
+    <!-- График: средняя цена по району -->
+    <div class="card mb-4 custom-card">
+        <div class="card-body">
+            <h4 class="text-light">Средняя цена по району</h4>
+            <canvas id="avgPriceChart" height="120"></canvas>
+        </div>
+    </div>
+
+</div>
+
+<!-- Scripts -->
+<script src="js/api.js"></script>
+<script src="js/charts.js"></script>
+
+</body>
+</html>
