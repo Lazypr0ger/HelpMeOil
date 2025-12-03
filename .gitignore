@@ -1,0 +1,24 @@
+﻿# Python
+__pycache__/
+*.pyc
+
+# Virtual env
+venv/
+
+# Data
+data/*.csv
+data/*.xlsx
+data/*.json
+
+# Logs
+*.log
+
+# Docker
+*.pid
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Node / frontend cache
+node_modules/
