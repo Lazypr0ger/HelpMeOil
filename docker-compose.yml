@@ -6,8 +6,8 @@ services:
     container_name: helpmeoil_db
     restart: always
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: daa200513DR
+      POSTGRES_USER: helpmeoil
+      POSTGRES_PASSWORD: helpmeoil_pass
       POSTGRES_DB: helpmeoil_db
     ports:
       - "5432:5432"

@@ -1,9 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
+from .db.database import Base, engine
 from .routers import stations, prices
+from .models import models  
 
-
+Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="HelpMeOil API",
     description="API для системы мониторинга цен на топливо HelpMeOil",
