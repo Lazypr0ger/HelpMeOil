@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Когда создадим роутеры — раскомментируем:
-# from .routers import stations, prices
+from .routers import stations, prices
+
 
 app = FastAPI(
     title="HelpMeOil API",
@@ -34,5 +34,5 @@ async def root():
 
 
 # Подключение роутеров (позже создадим их)
-# app.include_router(stations.router, prefix="/stations", tags=["stations"])
-# app.include_router(prices.router, prefix="/prices", tags=["prices"])
+app.include_router(stations.router, prefix="/stations", tags=["stations"])
+app.include_router(prices.router, prefix="/prices", tags=["prices"])
