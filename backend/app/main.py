@@ -1,39 +1,53 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .db.database import Base, engine
+from .db.database import engine, Base, get_db
 from .routers import stations, prices
-from .models import models  
+from .services.parser_service import run_full_parsing
+from sqlalchemy.orm import Session
 
-Base.metadata.create_all(bind=engine)
-app = FastAPI(
-    title="HelpMeOil API",
-    description="API для системы мониторинга цен на топливо HelpMeOil",
-    version="0.1.0",
-)
+import datetime
 
-# Разрешаем запросы с фронтенда (статический HTML, открытый в браузере)
-origins = [
-    "http://localhost",
-    "http://localhost:8000",
-    "http://127.0.0.1",
-    "http://127.0.0.1:8000",
-    "http://localhost:5500",    # если вдруг будешь запускать через Live Server
-]
+app = FastAPI(title="HelpMeOil API")
 
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # можно сузить до origins, когда всё отладим
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
-@app.get("/")
-async def root():
-    return {"message": "HelpMeOil API is running"}
+# Создаем таблицы
+Base.metadata.create_all(bind=engine)
 
 
-# Подключение роутеров (позже создадим их)
-app.include_router(stations.router, prefix="/stations", tags=["stations"])
-app.include_router(prices.router, prefix="/prices", tags=["prices"])
+def need_parse(db: Session):
+    """Нужно ли обновлять парсер (24 часа)?"""
+
+    from .models.models import FuelPrice
+
+    last = db.query(FuelPrice).order_by(FuelPrice.timestamp.desc()).first()
+    if not last:
+        return True
+
+    diff = datetime.datetime.now() - last.timestamp
+    return diff.total_seconds() > 24 * 3600
+
+
+# Запуск при старте
+@app.on_event("startup")
+def startup_event():
+    db = next(get_db())
+
+    if need_parse(db):
+        print("=== ЗАПУСК ЕЖЕДНЕВНОГО ПАРСЕРА ===")
+        result = run_full_parsing(db)
+        print("Парсинг завершён:", result)
+    else:
+        print("Парсер не нужен — данные свежие (<24h)")
+
+
+# Роутеры
+app.include_router(stations.router, prefix="/stations")
+app.include_router(prices.router, prefix="/prices")
