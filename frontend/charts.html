@@ -2,61 +2,50 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HelpMeOil — Графики</title>
-
-    <!-- Bootstrap -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-
-    <!-- Custom Style -->
+    <title>Динамика цен</title>
     <link rel="stylesheet" href="css/style.css">
-
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-<body>
 
-<nav class="navbar navbar-dark bg-dark px-3">
-    <a class="navbar-brand" href="station.html">← Назад</a>
-</nav>
+<body>
 
 <div class="container mt-4">
 
-    <h2 class="text-light">Аналитика цен</h2>
-    <p class="text-secondary">Здесь отображается динамика цен конкурентов и средние значения.</p>
+    <button class="btn btn-secondary mb-3" onclick="history.back()">← Назад</button>
 
-    <!-- Выбор вида топлива -->
-    <div class="mb-3">
-        <label class="text-light mb-2">Выберите вид топлива:</label>
-        <select id="fuelSelector" class="form-select bg-dark text-light">
-            <option value="Аи-92">Аи-92</option>
-            <option value="Аи-95">Аи-95</option>
-            <option value="Аи-95+">Аи-95+</option>
-            <option value="Аи-98">Аи-98</option>
-            <option value="ДТ">ДТ</option>
-            <option value="Газ">Газ</option>
-        </select>
-    </div>
+    <h2 id="stationName"></h2>
+    <p><strong>Город:</strong> <span id="stationCity"></span></p>
+    <p><strong>Адрес:</strong> <span id="stationAddress"></span></p>
 
-    <!-- График: динамика цен выбранного топлива -->
-    <div class="card mb-4 custom-card">
-        <div class="card-body">
-            <h4 class="text-light">Динамика цен</h4>
-            <canvas id="priceChart" height="120"></canvas>
+    <hr>
+
+    <h4>История цен</h4>
+
+    <div class="row">
+        <div class="col-md-6">
+            <h5>АИ-92</h5>
+            <canvas id="chartAI92"></canvas>
         </div>
-    </div>
 
-    <!-- График: средняя цена по району -->
-    <div class="card mb-4 custom-card">
-        <div class="card-body">
-            <h4 class="text-light">Средняя цена по району</h4>
-            <canvas id="avgPriceChart" height="120"></canvas>
+        <div class="col-md-6">
+            <h5>АИ-95</h5>
+            <canvas id="chartAI95"></canvas>
+        </div>
+
+        <div class="col-md-6 mt-4">
+            <h5>ДТ</h5>
+            <canvas id="chartDIESEL"></canvas>
+        </div>
+
+        <div class="col-md-6 mt-4">
+            <h5>Газ</h5>
+            <canvas id="chartGAS"></canvas>
         </div>
     </div>
 
 </div>
 
-<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="js/api.js"></script>
 <script src="js/charts.js"></script>
 

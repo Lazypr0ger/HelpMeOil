@@ -1,81 +1,44 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HelpMeOil — Станция</title>
-
-    <!-- Bootstrap -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-
-    <!-- Custom Style -->
-    <link rel="stylesheet" href="css/style.css">
-</head>
-<body>
-
-<!-- Навигация -->
-<nav class="navbar navbar-dark bg-dark px-3">
-    <a class="navbar-brand" href="index.html">← Назад</a>
-</nav>
-
 <div class="container mt-4">
 
-    <!-- Информация о станции -->
-    <div class="card custom-card mb-4">
-        <div class="card-body">
-            <h3 id="stationName" class="card-title text-light">Загрузка...</h3>
-            <p id="stationCity" class="text-secondary">Определение города...</p>
-        </div>
-    </div>
+    <button class="btn btn-secondary mb-3" onclick="history.back()">← Назад</button>
 
-    <!-- Рекомендуемая цена -->
-    <div class="card custom-card mb-4">
-        <div class="card-body">
-            <h4 class="text-light">Рекомендуемая цена</h4>
-            <p id="recommendedPrice" class="text-success fs-3">—</p>
+    <h2 id="stationName">Станция</h2>
+    <p><strong>Город:</strong> <span id="stationCity"></span></p>
+    <p><strong>Адрес:</strong> <span id="stationAddress"></span></p>
 
-            <p class="text-secondary mb-0">
-                Рассчитано на основе цен конкурентов в выбранном районе.
-            </p>
-        </div>
-    </div>
+    <button class="btn btn-warning mb-3" onclick="forceUpdateClick()">Обновить данные</button>
 
-    <!-- Конкуренты -->
-    <div class="card custom-card mb-4">
-        <div class="card-body">
-            <h4 class="text-light mb-3">Цены конкурентов</h4>
+    <hr>
 
-            <div class="table-responsive">
-                <table class="table table-dark table-bordered table-striped align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th>АЗС</th>
-                            <th>AI-92</th>
-                            <th>AI-95</th>
-                            <th>AI-95+</th>
-                            <th>AI-98</th>
-                            <th>ДТ</th>
-                            <th>Газ</th>
-                        </tr>
-                    </thead>
-                    <tbody id="competitorsTable">
-                        <!-- JS вставит строки -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
+    <h4>Рекомендуемые цены</h4>
+    <table class="table table-bordered" id="recommendedTable">
+        <thead>
+            <tr>
+                <th>Топливо</th>
+                <th>Цена</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
 
-    <!-- Переход к графикам -->
-    <a href="charts.html" class="btn btn-success btn-lg w-100 mb-5">
-        Посмотреть графики и аналитику
-    </a>
+    <hr>
 
+    <h4>Конкуренты в городе</h4>
+    <table class="table table-striped" id="competitorsTable">
+        <thead>
+            <tr>
+                <th>АЗС</th>
+                <th>Адрес</th>
+                <th>Бренд</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <hr>
+
+    <a id="chartLink" class="btn btn-info mt-3">Перейти к графикам цен</a>
 </div>
 
-<!-- Скрипты -->
 <script src="js/api.js"></script>
-<script src="js/script.js"></script>
-
-</body>
-</html>
+<script src="js/station.js"></script>

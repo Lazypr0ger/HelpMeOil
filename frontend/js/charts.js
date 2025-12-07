@@ -1,162 +1,130 @@
-/* ========================================================
-   charts.js — Графики для HelpMeOil (Chart.js + тёмная тема)
-   ======================================================== */
+// ==============================
+// ID станции из URL
+// ==============================
+function getStationId() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("id");
+}
 
-/* Глобальные переменные для графиков (чтобы можно было перерисовывать) */
-let priceChart = null;
-let avgPriceChart = null;
 
+// ==============================
+// Главная функция загрузки данных
+// ==============================
+document.addEventListener("DOMContentLoaded", async () => {
+    const id = getStationId();
+    if (!id) {
+        alert("Не указан id станции");
+        return;
+    }
 
-/* ===============================
-   Основная загрузка страницы графиков
-   =============================== */
-document.addEventListener("DOMContentLoaded", () => {
-    const select = document.getElementById("fuelSelector");
-    if (!select) return;
-
-    // При загрузке — строим графики для выбранного по умолчанию топлива
-    loadCharts(select.value);
-
-    // При смене топлива пересобираем графики
-    select.addEventListener("change", () => {
-        loadCharts(select.value);
-    });
+    await loadStationInfo(id);
+    await loadCharts(id);
 });
 
 
-/* ===============================
-   Построение двух графиков
-   =============================== */
-async function loadCharts(fuelType) {
-    const params = new URLSearchParams(window.location.search);
-    const stationId = params.get("id");
-    if (!stationId) return;
+// ==============================
+// Загрузка информации о станции
+// ==============================
+async function loadStationInfo(id) {
+    const station = await apiGetOurStation(id);
 
-    // Загружаем данные по станции
+    if (!station) {
+        alert("Станция не найдена");
+        return;
+    }
+
+    document.getElementById("stationName").innerText = station.name;
+    document.getElementById("stationCity").innerText = station.city;
+    document.getElementById("stationAddress").innerText = station.address || "—";
+}
+
+
+// ==============================
+// Загрузка и построение всех графиков
+// ==============================
+async function loadCharts(id) {
+    const fuels = ["AI92", "AI95", "DIESEL", "GAS"];
+
+    for (let fuel of fuels) {
+        await buildChart(id, fuel);
+    }
+}
+
+
+// ==============================
+// Построение одного графика топлива
+// ==============================
+async function buildChart(stationId, fuel) {
+    const ctx = document.getElementById(`chart${fuel}`);
+
+    // 1. История цен нашей станции
+    const myHistory = await apiGetPriceHistory(stationId, fuel, "our");
+
+    // 2. Город станции
     const station = await apiGetOurStation(stationId);
-    if (!station) return;
+    const city = station.city;
 
-    const district = station.district;
+    // 3. Средние цены конкурентов
+    const cityAvg = await apiGetCityAverages(city);
 
-    // История цен конкурентов
-    const history = await apiGetPriceHistory(station.name, fuelType);
+    // Фильтр по виду топлива
+    const avgFuel = cityAvg.filter(p => p.fuel_type_id && p.fuel_type_id !== null);
 
-    // Средняя цена по району
-    const avgHistory = await prepareDistrictAverages(history);
+    // ============ Преобразуем данные ============
 
-    drawPriceChart(history, fuelType);
-    drawAvgPriceChart(avgHistory, fuelType);
-}
+    const myData = myHistory.map(r => ({
+        x: r.date,
+        y: r.price
+    }));
 
+    const avgData = cityAvg
+        .filter(r => r.fuel_type_id === fuelTypeId(fuel))
+        .map(r => ({
+            x: r.date,
+            y: r.avg
+        }));
 
-/* ===============================
-   1. График динамики цен конкурентов
-   =============================== */
-function drawPriceChart(history, fuelType) {
-    const ctx = document.getElementById("priceChart");
-    if (!ctx) return;
+    // ========= Построение графика =========
 
-    // Удаляем старый график, иначе Chart.js наложит новый поверх
-    if (priceChart) {
-        priceChart.destroy();
-    }
-
-    const labels = history.map(item => item.timestamp);
-    const values = history.map(item => item.price);
-
-    priceChart = new Chart(ctx, {
+    new Chart(ctx, {
         type: "line",
         data: {
-            labels: labels,
-            datasets: [{
-                label: `Цена ${fuelType}`,
-                data: values,
-                borderWidth: 2,
-                borderColor: "#4CAF50",
-                backgroundColor: "rgba(76, 175, 80, 0.2)",
-                tension: 0.3
-            }]
+            datasets: [
+                {
+                    label: "Наша АЗС",
+                    data: myData,
+                    borderColor: "#0275d8",
+                    tension: 0.2
+                },
+                {
+                    label: "Средняя цена конкурентов",
+                    data: avgData,
+                    borderColor: "#d9534f",
+                    tension: 0.2
+                }
+            ]
         },
         options: {
             responsive: true,
-            plugins: {
-                legend: { labels: { color: "#e0e0e0" } }
-            },
             scales: {
-                x: { ticks: { color: "#ccc" }, grid: { color: "#333" } },
-                y: { ticks: { color: "#ccc" }, grid: { color: "#333" } }
+                x: { type: "time", time: { unit: "day" } },
+                y: { beginAtZero: false }
             }
         }
     });
 }
 
 
-/* ===============================
-   2. График средней цены по району
-   =============================== */
-function drawAvgPriceChart(history, fuelType) {
-    const ctx = document.getElementById("avgPriceChart");
-    if (!ctx) return;
-
-    if (avgPriceChart) {
-        avgPriceChart.destroy();
+// ==============================
+// Маппер fuel -> type_id
+// (ИСПОЛЬЗУЕМ ТЕ ЖЕ ID, КОТОРЫЕ В fuel_types)
+// ==============================
+function fuelTypeId(code) {
+    switch (code) {
+        case "AI92": return 1;
+        case "AI95": return 2;
+        case "DIESEL": return 3;
+        case "GAS": return 4;
+        default: return null;
     }
-
-    const labels = history.map(item => item.timestamp);
-    const values = history.map(item => item.avg);
-
-    avgPriceChart = new Chart(ctx, {
-        type: "line",
-        data: {
-            labels: labels,
-            datasets: [{
-                label: `Средняя цена ${fuelType} по району`,
-                data: values,
-                borderWidth: 2,
-                borderColor: "#2196F3",
-                backgroundColor: "rgba(33, 150, 243, 0.2)",
-                tension: 0.3
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: { labels: { color: "#e0e0e0" } }
-            },
-            scales: {
-                x: { ticks: { color: "#ccc" }, grid: { color: "#333" } },
-                y: { ticks: { color: "#ccc" }, grid: { color: "#333" } }
-            }
-        }
-    });
-}
-
-
-/* ===============================
-   Помощник: считаем среднюю цену по району
-   =============================== */
-async function prepareDistrictAverages(history) {
-    // Группируем по timestamp
-    const groups = {};
-
-    history.forEach(item => {
-        if (!groups[item.timestamp]) {
-            groups[item.timestamp] = [];
-        }
-        groups[item.timestamp].push(item.price);
-    });
-
-    const avgArray = [];
-
-    Object.keys(groups).forEach(ts => {
-        const prices = groups[ts];
-        const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
-
-        avgArray.push({
-            timestamp: ts,
-            avg: Number(avg.toFixed(2))
-        });
-    });
-
-    return avgArray;
 }

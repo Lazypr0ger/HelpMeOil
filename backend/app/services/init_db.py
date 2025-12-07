@@ -1,14 +1,8 @@
 from sqlalchemy.orm import Session
 from app.models.fuel import FuelType
-from app.services.init_db import init_fuel_types
 
 
-def init_db(db: Session):
-    """
-    Запускается при старте приложения.
-    Создаёт справочники и базовые записи.
-    """
-    init_fuel_types(db)
+
 
 DEFAULT_FUELS = [
     ("AI92", "АИ-92"),
@@ -31,3 +25,10 @@ def init_fuel_types(db: Session):
 
     db.commit()
     print("[INIT] fuel_types заполнены.")
+
+def init_db(db: Session):
+    """
+    Запускается при старте приложения.
+    Создаёт справочники и базовые записи.
+    """
+    init_fuel_types(db)

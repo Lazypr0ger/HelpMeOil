@@ -1,55 +1,84 @@
-/* ======================================================
-   API клиент HelpMeOil
-   ====================================================== */
-
+// ===========================
+// Конфигурация API
+// ===========================
 const API_BASE = "http://localhost:8000";
 
-async function fetchJSON(url) {
+async function apiRequest(url, method = "GET", body = null) {
+    const options = { method, headers: {} };
+
+    if (body !== null) {
+        options.headers["Content-Type"] = "application/json";
+        options.body = JSON.stringify(body);
+    }
+
     try {
-        const res = await fetch(API_BASE + url);
-        if (!res.ok) throw new Error("API error: " + res.status);
-        return await res.json();
-    } catch (e) {
-        console.error("Fetch error:", e);
+        const response = await fetch(API_BASE + url, options);
+        if (!response.ok) {
+            console.error("API error:", response.status, response.statusText);
+            return null;
+        }
+        return await response.json();
+    } catch (err) {
+        console.error("API fetch error:", err);
         return null;
     }
 }
 
-/* ================================
-   ГОРОДА
-   ================================ */
-async function apiGetCities() {
-    return fetchJSON("/stations/cities");
-}
 
-/* ================================
-   НАШИ СТАНЦИИ
-   ================================ */
+// ===========================
+// STATIONS API
+// ===========================
+
+// 1. Получить список наших АЗС
 async function apiGetOurStations() {
-    return fetchJSON("/stations/our");
+    return await apiRequest("/stations/our");
 }
 
+// 2. Получить информацию о конкретной нашей АЗС
 async function apiGetOurStation(id) {
-    return fetchJSON(`/stations/our/${id}`);
+    return await apiRequest(`/stations/our/${id}`);
 }
 
-/* ================================
-   КОНКУРЕНТЫ ПО ГОРОДУ
-   ================================ */
-async function apiGetCompetitorsByCity(cityName) {
-    return fetchJSON(`/stations/competitors?city=${encodeURIComponent(cityName)}`);
+// 3. Получить конкурентов по городу
+async function apiGetCompetitors(city) {
+    return await apiRequest(`/stations/competitors?city=${encodeURIComponent(city)}`);
 }
 
-/* ================================
-   ИСТОРИЯ ЦЕН ПО АЗС
-   ================================ */
-async function apiGetPriceHistory(stationId, fuelType) {
-    return fetchJSON(`/prices/history?station_id=${stationId}&fuel=${encodeURIComponent(fuelType)}`);
+
+// ===========================
+// PRICES API
+// ===========================
+
+// 4. История цен станции по топливу
+async function apiGetPriceHistory(station_id, fuel, station_type = "competitor") {
+    return await apiRequest(
+        `/prices/history?station_id=${station_id}&fuel=${fuel}&station_type=${station_type}`
+    );
 }
 
-/* ================================
-   РЕКОМЕНДОВАННАЯ ЦЕНА
-   ================================ */
-async function apiGetRecommendedPrice(stationId) {
-    return fetchJSON(`/prices/recommended/${stationId}`);
+// 5. Средние цены по городу
+async function apiGetCityAverages(city) {
+    return await apiRequest(`/prices/avg?city=${encodeURIComponent(city)}`);
+}
+
+// 6. Рекомендованные цены
+async function apiGetRecommended(our_station_id) {
+    return await apiRequest(`/prices/recommended/${our_station_id}`);
+}
+
+// 7. Последние цены станции (быстрый вывод)
+async function apiGetLatest(station_id, station_type = "competitor") {
+    return await apiRequest(
+        `/prices/latest?station_id=${station_id}&station_type=${station_type}`
+    );
+}
+
+
+// ===========================
+// UPDATE API
+// ===========================
+
+// 8. Принудительная загрузка данных
+async function apiForceUpdate() {
+    return await apiRequest("/update/force", "POST");
 }
