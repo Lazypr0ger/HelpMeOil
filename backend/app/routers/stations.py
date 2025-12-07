@@ -1,82 +1,117 @@
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.core.database import SessionLocal
-from app.models.station import OurStation, CompetitorStation
+from app.core.database import get_db
 from app.models.city import City
-from app.schemas.station import OurStationBase, CompetitorStationBase
+from app.models.station import CompetitorStation
+from app.models.price import FuelPrice
+from app.models.fuel import FuelType
+
+from pydantic import BaseModel
+
+router = APIRouter(
+    prefix="/stations",
+    tags=["stations"],
+)
+
+# ===== SCHEMAS =====
+
+class CityOut(BaseModel):
+    id: int
+    name: str
+
+    class Config:
+        from_attributes = True
 
 
-router = APIRouter()
+class FuelPriceOut(BaseModel):
+    fuel_type: str
+    price: float
+    date: str
+
+    class Config:
+        from_attributes = True
 
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+class CompetitorStationShort(BaseModel):
+    id: int
+    station_name: str
+    address: str
+    city_name: str
+
+    class Config:
+        from_attributes = True
 
 
-# -------------------------
-# 1. Получение наших АЗС
-# -------------------------
-@router.get("/our", response_model=list[OurStationBase])
-def get_our_stations(db: Session = Depends(get_db)):
-    stations = db.query(OurStation).all()
+class CompetitorStationDetail(BaseModel):
+    id: int
+    station_name: str
+    address: str
+    city: Optional[CityOut]
+    latest_prices: dict
 
-    return [
-        OurStationBase(
-            id=s.id,
-            name=s.name,
-            address=s.address,
-            city=s.city.name  # доступ к связанной таблице City
+    class Config:
+        from_attributes = True
+
+
+# ===== ENDPOINTS =====
+
+@router.get("/cities", response_model=List[CityOut])
+def get_cities(db: Session = Depends(get_db)):
+    return db.query(City).order_by(City.name).all()
+
+
+@router.get("/competitors", response_model=List[CompetitorStationShort])
+def get_competitors(db: Session = Depends(get_db)):
+    stations = db.query(CompetitorStation).all()
+
+    result = []
+    for s in stations:
+        result.append(
+            CompetitorStationShort(
+                id=s.id,
+                station_name=s.station_name,
+                address=s.address or "",
+                city_name=s.city.name if s.city else "",
+            )
         )
-        for s in stations
-    ]
+    return result
 
 
-# -------------------------
-# 2. Получение одной нашей АЗС
-# -------------------------
-@router.get("/our/{station_id}", response_model=OurStationBase)
-def get_our_station(station_id: int, db: Session = Depends(get_db)):
-    station = db.query(OurStation).filter(OurStation.id == station_id).first()
-
+@router.get("/competitors/{station_id}", response_model=CompetitorStationDetail)
+def get_competitor_detail(station_id: int, db: Session = Depends(get_db)):
+    station = db.query(CompetitorStation).filter_by(id=station_id).first()
     if not station:
-        raise HTTPException(404, "Station not found")
+        raise HTTPException(404, "Станция не найдена")
 
-    return OurStationBase(
-        id=station.id,
-        name=station.name,
-        address=station.address,
-        city=station.city.name
-    )
-
-
-# -------------------------
-# 3. Конкуренты по городу
-# -------------------------
-@router.get("/competitors", response_model=list[CompetitorStationBase])
-def get_competitors(city: str, db: Session = Depends(get_db)):
-    city_obj = db.query(City).filter(City.name.ilike(city)).first()
-
-    if not city_obj:
-        return []
-
-    competitors = (
-        db.query(CompetitorStation)
-          .filter(CompetitorStation.city_id == city_obj.id)
-          .all()
-    )
-
-    return [
-        CompetitorStationBase(
-            id=s.id,
-            station_name=s.station_name,
-            brand=s.brand,
-            address=s.address,
-            city=city_obj.name
+    # Последние цены по каждому виду топлива
+    subq = (
+        db.query(
+            FuelPrice.fuel_type_id,
+            db.func.max(FuelPrice.date).label("mx")
         )
-        for s in competitors
-    ]
+        .filter(FuelPrice.competitor_station_id == station_id)
+        .group_by(FuelPrice.fuel_type_id)
+        .subquery()
+    )
+
+    rows = (
+        db.query(FuelPrice)
+        .join(subq, (FuelPrice.fuel_type_id == subq.c.fuel_type_id) &
+                    (FuelPrice.date == subq.c.mx))
+        .all()
+    )
+
+    latest = {
+        r.fuel_type.code: float(r.price)
+        for r in rows
+    }
+
+    return CompetitorStationDetail(
+        id=station.id,
+        station_name=station.station_name,
+        address=station.address,
+        city=station.city,
+        latest_prices=latest
+    )

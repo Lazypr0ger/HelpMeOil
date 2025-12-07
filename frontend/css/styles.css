@@ -1,0 +1,152 @@
+/* ======== ТЁМНАЯ ТЕМА ======== */
+
+body {
+    margin: 0;
+    padding: 0;
+    background: #121212;
+    color: #e0e0e0;
+    font-family: Arial, sans-serif;
+}
+
+/* ======== ХЕДЕР ======== */
+
+.header {
+    background: #1f1f1f;
+    padding: 15px 25px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #333;
+}
+
+.header-title {
+    font-size: 28px;
+    font-weight: bold;
+    color: #ffffff;
+}
+
+.header button {
+    background: #ffcc00;
+    border: none;
+    padding: 10px 16px;
+    font-size: 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: #000;
+    font-weight: bold;
+}
+
+.header button:hover {
+    background: #e6b800;
+}
+
+/* ======== ОСНОВНОЙ КОНТЕЙНЕР ======== */
+
+.container {
+    max-width: 1100px;
+    margin: 30px auto;
+    padding: 0 20px;
+}
+
+/* Заголовки секций */
+.section-title {
+    font-size: 26px;
+    font-weight: bold;
+    margin-bottom: 15px;
+    color: #ffffff;
+}
+
+/* ======== КАРТОЧКИ СТАНЦИЙ ======== */
+
+.card-station {
+    background: #1e1e1e;
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 20px;
+    cursor: pointer;
+    border: 1px solid #333;
+    transition: 0.15s;
+}
+
+.card-station:hover {
+    transform: scale(1.02);
+    border-color: #ffcc00;
+}
+
+.card-title {
+    font-size: 20px;
+    font-weight: bold;
+    color: #ffffff;
+}
+
+.card-address {
+    margin-top: 5px;
+    font-size: 15px;
+    color: #bbbbbb;
+}
+
+/* Плашки цен */
+.price-pill {
+    display: inline-block;
+    background: #333;
+    padding: 6px 10px;
+    margin: 5px 5px 0 0;
+    border-radius: 6px;
+    color: #ffcc00;
+    font-weight: bold;
+}
+
+/* ======== ТАБЛИЦЫ ======== */
+
+.table-dark {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+.table-dark th,
+.table-dark td {
+    padding: 10px;
+    border: 1px solid #333;
+    text-align: left;
+}
+
+.table-dark th {
+    background: #222;
+    color: #ffcc00;
+}
+
+.table-dark tr:nth-child(even) {
+    background: #1a1a1a;
+}
+
+/* ======== ГРАФИКИ ======== */
+
+canvas {
+    background: #1f1f1f;
+    border-radius: 10px;
+    padding: 15px;
+}
+
+/* ======== СЕТКА ======== */
+
+.row {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.col-md-4 {
+    width: 33.33%;
+    padding: 10px;
+}
+
+.col-md-3 {
+    width: 25%;
+    padding: 10px;
+}
+
+@media (max-width: 768px) {
+    .col-md-4, .col-md-3 {
+        width: 100%;
+    }
+}

@@ -3,14 +3,15 @@ from app.core.database import Base, engine, SessionLocal
 from app.services.update_checker import need_update
 from app.services.parser_service import run_full_parsing
 from app.services.init_db import init_db
-from app.routers import update
+from app.routers import update, stations, prices, our_stations, analytics
 
 app = FastAPI(title="HelpMeOil API")
 app.include_router(update.router, prefix="/update", tags=["update"])
-#app.include_router(stations.router, prefix="/stations", tags=["stations"])
-#app.include_router(prices.router,   prefix="/prices", tags=["prices"])
+app.include_router(stations.router, prefix="/stations", tags=["stations"])
+app.include_router(prices.router,   prefix="/prices", tags=["prices"])
 app.include_router(update.router,   prefix="/update", tags=["update"])
-
+app.include_router(our_stations.router)
+app.include_router(analytics.router)
 Base.metadata.create_all(bind=engine)
 
 

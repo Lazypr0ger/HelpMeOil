@@ -1,44 +1,49 @@
-<div class="container mt-4">
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>АЗС — Детали</title>
 
-    <button class="btn btn-secondary mb-3" onclick="history.back()">← Назад</button>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-bg">
 
-    <h2 id="stationName">Станция</h2>
-    <p><strong>Город:</strong> <span id="stationCity"></span></p>
-    <p><strong>Адрес:</strong> <span id="stationAddress"></span></p>
+<nav class="navbar navbar-dark bg-dark px-4 shadow">
+    <a href="index.html" class="btn btn-outline-light">← Назад</a>
+    <span class="navbar-brand fs-4">HelpMeOil — Детали АЗС</span>
+</nav>
 
-    <button class="btn btn-warning mb-3" onclick="forceUpdateClick()">Обновить данные</button>
+<div class="container py-4">
 
-    <hr>
+    <h1 id="stationName" class="text-light mb-2"></h1>
+    <p id="stationAddress" class="text-secondary"></p>
 
-    <h4>Рекомендуемые цены</h4>
-    <table class="table table-bordered" id="recommendedTable">
-        <thead>
-            <tr>
-                <th>Топливо</th>
-                <th>Цена</th>
-            </tr>
-        </thead>
-        <tbody></tbody>
-    </table>
+    <h3 class="text-light mt-4">Рекомендуемые цены</h3>
+    <div id="recommendedPrices" class="row g-3"></div>
 
-    <hr>
-
-    <h4>Конкуренты в городе</h4>
-    <table class="table table-striped" id="competitorsTable">
+    <h3 class="text-light mt-5">Конкуренты в городе</h3>
+    <table class="table table-dark table-striped" id="competitorsTable">
         <thead>
             <tr>
                 <th>АЗС</th>
-                <th>Адрес</th>
-                <th>Бренд</th>
+                <th>92</th>
+                <th>95</th>
+                <th>ДТ</th>
+                <th>Газ</th>
             </tr>
         </thead>
         <tbody></tbody>
     </table>
 
-    <hr>
+    <h3 class="text-light mt-5">Графики цен</h3>
+    <canvas id="priceHistoryChart"></canvas>
 
-    <a id="chartLink" class="btn btn-info mt-3">Перейти к графикам цен</a>
 </div>
 
-<script src="js/api.js"></script>
-<script src="js/station.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="api.js"></script>
+<script src="station.js"></script>
+
+</body>
+</html>

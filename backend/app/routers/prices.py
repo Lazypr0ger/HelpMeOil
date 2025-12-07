@@ -1,149 +1,195 @@
+# backend/app/routers/prices.py
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from typing import List, Optional
 
-from app.core.database import SessionLocal
-from app.models.price import FuelPrice, StationType
-from app.models.station import OurStation, CompetitorStation
+from app.core.database import get_db
+from app.models.price import FuelPrice
+from app.models.station import CompetitorStation, OurStation
 from app.models.city import City
-from app.schemas.price import PriceRecord
-from app.services.analytics import get_recommended_price
+from app.models.fuel import FuelType
+
+from pydantic import BaseModel
+from datetime import datetime
 
 
-router = APIRouter()
+router = APIRouter(
+    prefix="/prices",
+    tags=["prices"]
+)
+
+# ------------------------
+#  SCHEMAS
+# ------------------------
+
+class PricePoint(BaseModel):
+    timestamp: str
+    price: float
+
+class FuelHistoryOut(BaseModel):
+    fuel_type: str
+    history: List[PricePoint]
+
+class LatestFuelPrice(BaseModel):
+    fuel_type: str
+    price: float
+    timestamp: Optional[str]
+
+class MarketAvgOut(BaseModel):
+    fuel_type: str
+    avg_price: float
 
 
-# -------------------------
-#  DB dependency
-# -------------------------
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-# ================================================================
-# 1. ИСТОРИЯ ЦЕН СТАНЦИИ ПО ВИДУ ТОПЛИВА
-# ================================================================
-@router.get("/history", response_model=list[PriceRecord])
+# ===============================================================
+# 1. Получить историю цен станции: competitor или our
+# ===============================================================
+@router.get("/history", response_model=List[FuelHistoryOut])
 def get_price_history(
     station_id: int,
-    fuel: str,
-    station_type: StationType = StationType.competitor,
+    station_type: str,   # "competitor" or "our"
     db: Session = Depends(get_db)
 ):
-    """
-    Возвращает историю цен по конкретной станции и типу топлива.
-    Используется на странице station.html и charts.html.
-    """
+    if station_type not in ("competitor", "our"):
+        raise HTTPException(400, "station_type must be competitor or our")
 
-    records = (
-        db.query(FuelPrice)
-        .filter(FuelPrice.station_type == station_type)
-        .filter(FuelPrice.station_id == station_id)
-        .filter(FuelPrice.fuel_type.has(code=fuel))
-        .order_by(FuelPrice.date.asc())
-        .all()
-    )
-
-    return [
-        PriceRecord(date=r.date, price=float(r.price))
-        for r in records
-    ]
-
-
-# ================================================================
-# 2. СРЕДНИЕ ЦЕНЫ КОНКУРЕНТОВ ПО ГОРОДУ (для графиков)
-# ================================================================
-@router.get("/avg")
-def get_city_average_prices(city: str, db: Session = Depends(get_db)):
-    """
-    Возвращает средние цены по каждому виду топлива за каждый день.
-    Используется charts.js.
-    """
-
-    city_obj = db.query(City).filter(City.name.ilike(city)).first()
-    if not city_obj:
+    if station_type == "competitor":
+        prices = (
+            db.query(FuelPrice)
+            .filter(FuelPrice.competitor_station_id == station_id)
+            .order_by(FuelPrice.date)
+            .all()
+        )
+    else:
+        prices = (
+            db.query(FuelPrice)
+            .filter(FuelPrice.our_station_id == station_id)
+            .order_by(FuelPrice.date)
+            .all()
+        )
+    
+    if not prices:
         return []
 
-    rows = (
+    # группируем по fuel_type
+    history_map = {}
+    for p in prices:
+        key = p.fuel_type.code
+        if key not in history_map:
+            history_map[key] = []
+        history_map[key].append(
+            PricePoint(
+                timestamp=p.date.isoformat(),
+                price=float(p.price)
+            )
+        )
+
+    result = [
+        FuelHistoryOut(fuel_type=fuel, history=pts)
+        for fuel, pts in history_map.items()
+    ]
+    return result
+
+
+# ===============================================================
+# 2. Получить последние цены по станции
+# ===============================================================
+@router.get("/latest", response_model=List[LatestFuelPrice])
+def get_latest_prices(
+    station_id: int,
+    station_type: str,
+    db: Session = Depends(get_db)
+):
+    if station_type not in ("competitor", "our"):
+        raise HTTPException(400, "station_type must be competitor or our")
+
+    subq = (
         db.query(
             FuelPrice.fuel_type_id,
-            FuelPrice.date,
-            func.avg(FuelPrice.price).label("avg_price")
+            db.func.max(FuelPrice.date).label("mx")
         )
-        .join(FuelPrice.competitor_station)
-        .filter(CompetitorStation.city_id == city_obj.id)
-        .group_by(FuelPrice.fuel_type_id, FuelPrice.date)
-        .order_by(FuelPrice.date.asc())
+        .filter(
+            FuelPrice.competitor_station_id == station_id
+            if station_type == "competitor"
+            else FuelPrice.our_station_id == station_id
+        )
+        .group_by(FuelPrice.fuel_type_id)
+        .subquery()
+    )
+
+    rows = (
+        db.query(FuelPrice)
+        .join(
+            subq,
+            (FuelPrice.fuel_type_id == subq.c.fuel_type_id)
+            & (FuelPrice.date == subq.c.mx)
+        )
+        .all()
+    )
+
+    result = []
+    for r in rows:
+        result.append(
+            LatestFuelPrice(
+                fuel_type=r.fuel_type.code,
+                price=float(r.price),
+                timestamp=r.date.isoformat()
+            )
+        )
+    return result
+
+
+# ===============================================================
+# 3. Средняя рыночная цена по каждому виду топлива в городе
+# ===============================================================
+@router.get("/market/city", response_model=List[MarketAvgOut])
+def get_city_market_avg(
+    city_id: int,
+    db: Session = Depends(get_db)
+):
+    rows = (
+        db.query(
+            FuelType.code,
+            db.func.avg(FuelPrice.price)
+        )
+        .join(FuelType, FuelType.id == FuelPrice.fuel_type_id)
+        .join(CompetitorStation, CompetitorStation.id == FuelPrice.competitor_station_id)
+        .filter(CompetitorStation.city_id == city_id)
+        .group_by(FuelType.code)
         .all()
     )
 
     return [
-        {
-            "fuel_type_id": fuel_type_id,
-            "date": date,
-            "avg": float(avg_price)
-        }
-        for fuel_type_id, date, avg_price in rows
+        MarketAvgOut(
+            fuel_type=code,
+            avg_price=float(avg)
+        )
+        for code, avg in rows
     ]
 
 
-# ================================================================
-# 3. РЕКОМЕНДОВАННАЯ ЦЕНА ДЛЯ НАШЕЙ СТАНЦИИ
-# ================================================================
-@router.get("/recommended/{station_id}")
-def recommended_price(station_id: int, db: Session = Depends(get_db)):
-    """
-    Возвращает словарь вида:
-    {
-        "92": 45.10,
-        "95": 48.30,
-        "diesel": 49.90,
-        ...
-    }
-    """
-    station = db.query(OurStation).filter(OurStation.id == station_id).first()
-    if not station:
-        raise HTTPException(404, "Station not found")
-
-    result = get_recommended_price(station_id, db)
-
-    return {
-        "station_id": station_id,
-        "city": station.city.name,
-        "recommended_prices": result
-    }
-
-
-# ================================================================
-# 4. ПОСЛЕДНИЕ ЦЕНЫ СТАНЦИИ (для быстрого отображения)
-# ================================================================
-@router.get("/latest")
-def get_latest_prices(
-    station_id: int,
-    station_type: StationType = StationType.competitor,
+# ===============================================================
+# 4. Средняя цена по области (всем конкурентам)
+# ===============================================================
+@router.get("/market/region", response_model=List[MarketAvgOut])
+def get_region_market_avg(
     db: Session = Depends(get_db)
 ):
-    """
-    Возвращает последние известные цены станции любого типа (нашей или конкурента).
-    Удобно для отображения таблиц.
-    """
-
-    q = (
-        db.query(FuelPrice)
-        .filter(FuelPrice.station_type == station_type)
-        .filter(FuelPrice.station_id == station_id)
-        .order_by(FuelPrice.date.desc(), FuelPrice.created_at.desc())
+    rows = (
+        db.query(
+            FuelType.code,
+            db.func.avg(FuelPrice.price)
+        )
+        .join(FuelType, FuelType.id == FuelPrice.fuel_type_id)
+        .filter(FuelPrice.competitor_station_id.isnot(None))
+        .group_by(FuelType.code)
         .all()
     )
 
-    result = {}
-    for rec in q:
-        fuel_name = rec.fuel_type.code
-        if fuel_name not in result:
-            result[fuel_name] = float(rec.price)
-
-    return result
+    return [
+        MarketAvgOut(
+            fuel_type=code,
+            avg_price=float(avg)
+        )
+        for code, avg in rows
+    ]
