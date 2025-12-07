@@ -295,7 +295,7 @@ def ensure_our_station_exists(db: Session, city: City):
 
     station = OurStation(
         name=f"HelpMeOil – {city.name}",
-        address=f"{city.name}, адрес не указан",
+        address=f"{city.name}",
         city_id=city.id
     )
     db.add(station)

@@ -1,6 +1,14 @@
 console.log("SCRIPT LOADED");
+console.log("SCRIPT STARTED");
+
+document.addEventListener("DOMContentLoaded", () => {
+    console.log("DOM READY — calling loadStations()");
+    loadStations();
+    loadMarketAnalytics();
+});
 
 async function loadStations() {
+     console.log("loadStations() CALLED");
     const container = document.getElementById("stationsContainer");
     const counter = document.getElementById("stationsCount");
 
@@ -35,7 +43,10 @@ async function loadStations() {
 
             const subtitle = document.createElement("div");
             subtitle.className = "card-address";
-            subtitle.textContent = `${station.city} · ${station.address}`;
+            const city = station.city_name || "";
+            const addr = station.address || "";
+            subtitle.textContent = city ? `${city}${addr ? " · " + addr : ""}` : addr;
+
 
             card.appendChild(title);
             card.appendChild(subtitle);

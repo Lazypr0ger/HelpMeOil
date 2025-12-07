@@ -2,6 +2,8 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func   # ← исправлено, раньше было db.func
+
 from typing import List, Optional
 
 from app.core.database import get_db
@@ -11,7 +13,6 @@ from app.models.city import City
 from app.models.fuel import FuelType
 
 from pydantic import BaseModel
-from datetime import datetime
 
 
 router = APIRouter(
@@ -42,7 +43,7 @@ class MarketAvgOut(BaseModel):
 
 
 # ===============================================================
-# 1. Получить историю цен станции: competitor или our
+# 1. История цен станции (competitor / our)
 # ===============================================================
 @router.get("/history", response_model=List[FuelHistoryOut])
 def get_price_history(
@@ -53,46 +54,32 @@ def get_price_history(
     if station_type not in ("competitor", "our"):
         raise HTTPException(400, "station_type must be competitor or our")
 
+    query = db.query(FuelPrice).order_by(FuelPrice.date)
+
     if station_type == "competitor":
-        prices = (
-            db.query(FuelPrice)
-            .filter(FuelPrice.competitor_station_id == station_id)
-            .order_by(FuelPrice.date)
-            .all()
-        )
+        prices = query.filter(FuelPrice.competitor_station_id == station_id).all()
     else:
-        prices = (
-            db.query(FuelPrice)
-            .filter(FuelPrice.our_station_id == station_id)
-            .order_by(FuelPrice.date)
-            .all()
-        )
-    
+        prices = query.filter(FuelPrice.our_station_id == station_id).all()
+
     if not prices:
         return []
 
     # группируем по fuel_type
     history_map = {}
     for p in prices:
-        key = p.fuel_type.code
-        if key not in history_map:
-            history_map[key] = []
-        history_map[key].append(
-            PricePoint(
-                timestamp=p.date.isoformat(),
-                price=float(p.price)
-            )
+        code = p.fuel_type.code
+        history_map.setdefault(code, []).append(
+            PricePoint(timestamp=p.date.isoformat(), price=float(p.price))
         )
 
-    result = [
+    return [
         FuelHistoryOut(fuel_type=fuel, history=pts)
         for fuel, pts in history_map.items()
     ]
-    return result
 
 
 # ===============================================================
-# 2. Получить последние цены по станции
+# 2. Последние цены по станции
 # ===============================================================
 @router.get("/latest", response_model=List[LatestFuelPrice])
 def get_latest_prices(
@@ -103,16 +90,19 @@ def get_latest_prices(
     if station_type not in ("competitor", "our"):
         raise HTTPException(400, "station_type must be competitor or our")
 
+    id_filter = (
+        FuelPrice.competitor_station_id == station_id
+        if station_type == "competitor"
+        else FuelPrice.our_station_id == station_id
+    )
+
+    # Подзапрос последних дат по каждому виду топлива
     subq = (
         db.query(
             FuelPrice.fuel_type_id,
-            db.func.max(FuelPrice.date).label("mx")
+            func.max(FuelPrice.date).label("mx")
         )
-        .filter(
-            FuelPrice.competitor_station_id == station_id
-            if station_type == "competitor"
-            else FuelPrice.our_station_id == station_id
-        )
+        .filter(id_filter)
         .group_by(FuelPrice.fuel_type_id)
         .subquery()
     )
@@ -121,26 +111,24 @@ def get_latest_prices(
         db.query(FuelPrice)
         .join(
             subq,
-            (FuelPrice.fuel_type_id == subq.c.fuel_type_id)
-            & (FuelPrice.date == subq.c.mx)
+            (FuelPrice.fuel_type_id == subq.c.fuel_type_id) &
+            (FuelPrice.date == subq.c.mx)
         )
         .all()
     )
 
-    result = []
-    for r in rows:
-        result.append(
-            LatestFuelPrice(
-                fuel_type=r.fuel_type.code,
-                price=float(r.price),
-                timestamp=r.date.isoformat()
-            )
+    return [
+        LatestFuelPrice(
+            fuel_type=r.fuel_type.code,
+            price=float(r.price),
+            timestamp=r.date.isoformat()
         )
-    return result
+        for r in rows
+    ]
 
 
 # ===============================================================
-# 3. Средняя рыночная цена по каждому виду топлива в городе
+# 3. Средняя цена по городу (только конкуренты)
 # ===============================================================
 @router.get("/market/city", response_model=List[MarketAvgOut])
 def get_city_market_avg(
@@ -150,9 +138,9 @@ def get_city_market_avg(
     rows = (
         db.query(
             FuelType.code,
-            db.func.avg(FuelPrice.price)
+            func.avg(FuelPrice.price)
         )
-        .join(FuelType, FuelType.id == FuelPrice.fuel_type_id)
+        .join(FuelPrice, FuelPrice.fuel_type_id == FuelType.id)
         .join(CompetitorStation, CompetitorStation.id == FuelPrice.competitor_station_id)
         .filter(CompetitorStation.city_id == city_id)
         .group_by(FuelType.code)
@@ -160,25 +148,20 @@ def get_city_market_avg(
     )
 
     return [
-        MarketAvgOut(
-            fuel_type=code,
-            avg_price=float(avg)
-        )
+        MarketAvgOut(fuel_type=code, avg_price=float(avg))
         for code, avg in rows
     ]
 
 
 # ===============================================================
-# 4. Средняя цена по области (всем конкурентам)
+# 4. Средняя цена по региону (все конкуренты)
 # ===============================================================
 @router.get("/market/region", response_model=List[MarketAvgOut])
-def get_region_market_avg(
-    db: Session = Depends(get_db)
-):
+def get_region_market_avg(db: Session = Depends(get_db)):
     rows = (
         db.query(
             FuelType.code,
-            db.func.avg(FuelPrice.price)
+            func.avg(FuelPrice.price)
         )
         .join(FuelType, FuelType.id == FuelPrice.fuel_type_id)
         .filter(FuelPrice.competitor_station_id.isnot(None))
@@ -187,9 +170,6 @@ def get_region_market_avg(
     )
 
     return [
-        MarketAvgOut(
-            fuel_type=code,
-            avg_price=float(avg)
-        )
+        MarketAvgOut(fuel_type=code, avg_price=float(avg))
         for code, avg in rows
     ]

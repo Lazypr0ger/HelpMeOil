@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func   # ← ДОБАВЛЕНО
+
 from typing import List
 
 from app.core.database import get_db
@@ -7,9 +9,10 @@ from app.models.station import OurStation, CompetitorStation
 from app.models.price import FuelPrice
 from app.models.fuel import FuelType
 from app.models.city import City
+
 from pydantic import BaseModel
 
-router = APIRouter(prefix="/stations/our", tags=["our stations"])
+router = APIRouter(prefix="/our-stations", tags=["our stations"])
 
 
 # ==== SCHEMAS ====
@@ -33,11 +36,12 @@ def get_our_stations(db: Session = Depends(get_db)):
     result = []
 
     for s in stations:
-        # Последние цены
+
+        # --- последние цены ---
         subq = (
             db.query(
                 FuelPrice.fuel_type_id,
-                db.func.max(FuelPrice.date).label("mx")
+                func.max(FuelPrice.date).label("mx")   # ← FIXED
             )
             .filter(FuelPrice.our_station_id == s.id)
             .group_by(FuelPrice.fuel_type_id)
@@ -46,15 +50,15 @@ def get_our_stations(db: Session = Depends(get_db)):
 
         rows = (
             db.query(FuelPrice)
-            .join(subq, (FuelPrice.fuel_type_id == subq.c.fuel_type_id) &
-                        (FuelPrice.date == subq.c.mx))
+            .join(
+                subq,
+                (FuelPrice.fuel_type_id == subq.c.fuel_type_id) &
+                (FuelPrice.date == subq.c.mx)
+            )
             .all()
         )
 
-        prices = {
-            r.fuel_type.code: float(r.price)
-            for r in rows
-        }
+        prices = {r.fuel_type.code: float(r.price) for r in rows}
 
         result.append(
             OurStationOut(
@@ -75,11 +79,10 @@ def station_details(station_id: int, db: Session = Depends(get_db)):
     if not st:
         raise HTTPException(404, "Станция не найдена")
 
-    # последние цены
     subq = (
         db.query(
             FuelPrice.fuel_type_id,
-            db.func.max(FuelPrice.date).label("mx")
+            func.max(FuelPrice.date).label("mx")   # ← FIXED
         )
         .filter(FuelPrice.our_station_id == station_id)
         .group_by(FuelPrice.fuel_type_id)
@@ -88,8 +91,11 @@ def station_details(station_id: int, db: Session = Depends(get_db)):
 
     rows = (
         db.query(FuelPrice)
-        .join(subq, (FuelPrice.fuel_type_id == subq.c.fuel_type_id) &
-                    (FuelPrice.date == subq.c.mx))
+        .join(
+            subq,
+            (FuelPrice.fuel_type_id == subq.c.fuel_type_id) &
+            (FuelPrice.date == subq.c.mx)
+        )
         .all()
     )
 

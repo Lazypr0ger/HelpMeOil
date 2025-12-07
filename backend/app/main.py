@@ -4,6 +4,7 @@ from app.services.update_checker import need_update
 from app.services.parser_service import run_full_parsing
 from app.services.init_db import init_db
 from app.routers import update, stations, prices, our_stations, analytics
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="HelpMeOil API")
 app.include_router(update.router, prefix="/update", tags=["update"])
@@ -13,7 +14,12 @@ app.include_router(update.router,   prefix="/update", tags=["update"])
 app.include_router(our_stations.router)
 app.include_router(analytics.router)
 Base.metadata.create_all(bind=engine)
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.on_event("startup")
 def startup_event():

@@ -1,10 +1,9 @@
-// frontend/api.js
-console.log("SCRIPT LOADED");
+console.log("API LOADED");
 
-// Базовый адрес бэкенда
+// Backend URL
 const API_BASE = "http://localhost:8000";
 
-// Универсальный GET
+// GET
 async function apiGet(path) {
     const res = await fetch(API_BASE + path);
     if (!res.ok) {
@@ -14,7 +13,7 @@ async function apiGet(path) {
     return res.json();
 }
 
-// Универсальный POST
+// POST
 async function apiPost(path) {
     const res = await fetch(API_BASE + path, { method: "POST" });
     if (!res.ok) {
@@ -24,35 +23,33 @@ async function apiPost(path) {
     return res.json().catch(() => ({}));
 }
 
-/* -----------------------------------------------------
-   НАШИ АЗС (frontend ←→ backend /our-stations API)
------------------------------------------------------ */
-
-// Получить список всех наших виртуальных АЗС
+// OUR STATIONS API
 async function getOurStations() {
     return apiGet("/our-stations");
 }
 
-// Получить информацию по одной нашей АЗС
 async function getStationDetails(id) {
     return apiGet(`/our-stations/${id}`);
 }
 
-// Получить конкурентов в этом городе
 async function getStationCompetitors(id) {
     return apiGet(`/our-stations/${id}/competitors`);
 }
 
-// История цен по нашей АЗС
 async function getStationPriceHistory(id) {
     return apiGet(`/our-stations/${id}/history`);
 }
 
-/* -----------------------------------------------------
-   ОБНОВЛЕНИЕ ДАННЫХ
------------------------------------------------------ */
+// MARKET API
+async function getMarketAverages() {
+    return apiGet("/analytics/market/avg");
+}
 
-// Принудительно запустить парсер
+async function getMarketHistory() {
+    return apiGet("/analytics/market/history");
+}
+
+// UPDATE API
 async function forceUpdate() {
     return apiPost("/update/force");
 }
