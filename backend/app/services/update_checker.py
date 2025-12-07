@@ -1,19 +1,28 @@
-import datetime
 from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
 from app.models.price import FuelPrice
 
 
-def need_update(db: Session) -> bool:
+def need_update(db: Session, hours: int = 12) -> bool:
     """
-    Проверяем, нужно ли запускать парсер.
-    Условие: если последняя запись старше 12 часов.
+    Проверяет, прошли ли N часов с последнего обновления цен.
+    Если данных нет — запуск обязателен.
     """
-    last_record = db.query(FuelPrice).order_by(FuelPrice.created_at.desc()).first()
+
+    last_record = db.query(FuelPrice).order_by(FuelPrice.date.desc()).first()
 
     if not last_record:
-        return True  # данных нет → нужно обновлять
+        return True  # данных нет → надо парсить
 
-    now = datetime.datetime.utcnow()
-    diff = now - last_record.created_at
+    last_time = last_record.date
 
-    return diff.total_seconds() > 12 * 3600
+    # Если date — это datetime.date (без времени)
+    # то считаем от полубночи
+    if isinstance(last_time, datetime):
+        last_dt = last_time
+    else:
+        last_dt = datetime.combine(last_time, datetime.min.time())
+
+    now = datetime.now()
+
+    return (now - last_dt) > timedelta(hours=hours)

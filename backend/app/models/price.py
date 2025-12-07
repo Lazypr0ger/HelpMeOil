@@ -1,59 +1,28 @@
-from datetime import date, datetime
-
-from sqlalchemy import (
-    Column, Integer, Numeric, Date, DateTime,
-    Enum, ForeignKey
-)
+from sqlalchemy import Column, Integer, Float, ForeignKey, DateTime, Enum
 from sqlalchemy.orm import relationship
+from app.core.database import Base
 import enum
 
-from app.core.database import Base
-
-
-class StationType(str, enum.Enum):
-    competitor = "competitor"
+class StationType(enum.Enum):
     our = "our"
+    competitor = "competitor"
 
 
 class FuelPrice(Base):
     __tablename__ = "fuel_prices"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
 
-    station_id = Column(Integer, nullable=False)
-    station_type = Column(
-        Enum(StationType, name="station_type_enum"),
-        nullable=False
-    )
+    station_type = Column(Enum(StationType), nullable=False)
+
+    competitor_station_id = Column(Integer, ForeignKey("competitor_stations.id"))
+    our_station_id = Column(Integer, ForeignKey("our_stations.id"))
 
     fuel_type_id = Column(Integer, ForeignKey("fuel_types.id"), nullable=False)
+    price = Column(Float, nullable=False)
+    date = Column(DateTime, nullable=False)
 
-    price = Column(Numeric(10, 2), nullable=False)
-    date = Column(Date, default=date.today, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    competitor_station = relationship("CompetitorStation", back_populates="prices")
+    our_station = relationship("OurStation", back_populates="prices")
 
-    # связи
     fuel_type = relationship("FuelType", back_populates="prices")
-
-    # удобные связи (опциональные, но полезные)
-    competitor_station_id = Column(
-        Integer,
-        ForeignKey("competitor_stations.id"),
-        nullable=True
-    )
-    our_station_id = Column(
-        Integer,
-        ForeignKey("our_stations.id"),
-        nullable=True
-    )
-
-    competitor_station = relationship(
-        "CompetitorStation",
-        back_populates="prices",
-        foreign_keys=[competitor_station_id],
-    )
-    our_station = relationship(
-        "OurStation",
-        back_populates="prices",
-        foreign_keys=[our_station_id],
-    )

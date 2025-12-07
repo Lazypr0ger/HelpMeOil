@@ -1,95 +1,139 @@
-import requests
 from bs4 import BeautifulSoup
+import requests
 from typing import List, Dict, Optional
+import re
 
 BASE_URL = "https://russiabase.ru/prices"
 
 
-def fetch_page(region: int, page: int) -> Optional[str]:
-    """
-    Загружает HTML страницу по региону и номеру страницы.
-    """
-    url = f"{BASE_URL}?region={region}&page={page}"
-    response = requests.get(url, timeout=10)
+import requests
 
-    if response.status_code != 200:
+def fetch_page(region: int, page: int) -> str | None:
+    url = f"{BASE_URL}?region={region}&page={page}"
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Accept-Language": "ru-RU,ru;q=0.9"
+    }
+
+    try:
+        r = requests.get(url, headers=headers, timeout=12)
+        if r.status_code == 200:
+            return r.text
+        print(f"[WARN] Bad response {r.status_code} on page {page}")
         return None
 
-    return response.text
+    except requests.exceptions.Timeout:
+        print(f"[ERROR] Timeout while requesting {url}")
+        return None
+
+    except requests.exceptions.RequestException as e:
+        print(f"[ERROR] Request failed: {e}")
+        return None
 
 
-def parse_table(html: str) -> List[Dict]:
-    """
-    Парсит таблицу со страницы russiabase.ru
-    Возвращает список словарей:
-    {
-        "station_name": "...",
-        "city": "...",
-        "prices": {
-            "AI92": ...,
-            "AI95": ...,
-            "DIESEL": ...,
-            "GAS": ...
-        }
-    }
-    """
+
+def parse_cards(html: str) -> List[Dict]:
     soup = BeautifulSoup(html, "html.parser")
-    table = soup.find("table")
 
-    if table is None:
-        return []
+    # Каждая карточка заправки:
+    cards = soup.select("div.ListingCard_orgCard__xCwyi")
 
-    rows = table.find_all("tr")[1:]  # пропускаем заголовок
+    results = []
 
-    result = []
+    for card in cards:
+        # -------- Название станции --------
+        name_tag = card.select_one("a.ListingCard_name__O9sxw")
+        station_name = name_tag.get_text(strip=True) if name_tag else None
 
-    for row in rows:
-        cols = [c.text.strip() for c in row.find_all("td")]
+        # -------- Адрес --------
+        address_tag = card.select_one("p.ListingCard_iconBlockText___egMo")
+        address = address_tag.get_text(strip=True) if address_tag else None
 
-        if len(cols) < 6:
-            continue
+       # -------- Город --------
+        loc_tag = card.select_one("div.ListingCard_location__yrEON a:last-child")
+        raw_city = loc_tag.get_text(strip=True) if loc_tag else None
+        city = clean_city_name(raw_city)
 
-        station_name = cols[0]
-        city = cols[1]
+        # -------- Цены --------
+        prices_block = card.select("div.PricesListNew_block__4lVEL")
 
-        ai92 = cols[2] or None
-        ai95 = cols[3] or None
-        diesel = cols[4] or None
-        gas = cols[5] or None
+        prices = {}
+        for pb in prices_block:
+            fuel_name = pb.select_one("div.PricesListNew_blockLabel__FyFeq")
+            fuel_price = pb.select_one("div.PricesListNew_pricing__m0s8Y p")
 
-        result.append({
+            if not fuel_name or not fuel_price:
+                continue
+
+            fname = fuel_name.get_text(strip=True)
+            fprice = fuel_price.get_text(strip=True).replace("р.", "").replace(",", ".").strip()
+
+            # Маппинг реальных названий в наши fuel_code
+            if "92" in fname and "+" not in fname:
+                fuel_code = "AI92"
+            elif "92+" in fname:
+                fuel_code = "AI92PLUS"
+            elif "95" in fname:
+                fuel_code = "AI95"
+            elif "Газ" in fname or "ГАЗ" in fname:
+                fuel_code = "GAS"
+            elif "ДТ" in fname:
+                fuel_code = "DIESEL"
+            else:
+                continue
+
+            try:
+                fprice = float(fprice)
+            except:
+                fprice = None
+
+            prices[fuel_code] = fprice
+
+        results.append({
             "station_name": station_name,
             "city": city,
-            "prices": {
-                "AI92": ai92,
-                "AI95": ai95,
-                "DIESEL": diesel,
-                "GAS": gas
-            }
+            "address": address,
+            "prices": prices
         })
 
-    return result
+    return results
 
 
-def get_all_pages(region: int) -> List[Dict]:
-    """
-    Загружает и парсит все страницы подряд, 
-    пока таблица не пропадёт или не будет пустой.
-    """
+def get_all_pages(region: int):
     page = 1
-    result = []
+    results = []
 
     while True:
         html = fetch_page(region, page)
-        if html is None:
+
+        if not html:
+            print(f"[INFO] Page {page} unavailable → stop.")
             break
 
-        rows = parse_table(html)
-        if not rows:
+        parsed = parse_cards(html)
+
+        if not parsed:
             break
 
-        result.extend(rows)
-
+        results.extend(parsed)
         page += 1
 
-    return result
+    return results
+
+def clean_city_name(raw: str | None) -> Optional[str]:
+    if not raw:
+        return None
+    s = raw.strip()
+
+    # убираем ведущие номера вида "21. " или "21 " или "21,"
+    s = re.sub(r'^\d+[\.,]\s*', '', s)
+
+    # если после этого строка пустая — ничего не возвращаем
+    if not s:
+        return None
+
+    # если строка чисто числовая (типа "60.3") — считаем мусором
+    if re.fullmatch(r'\d+([\.,]\d+)?', s):
+        return None
+
+    return s

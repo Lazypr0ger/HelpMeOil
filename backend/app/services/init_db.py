@@ -13,19 +13,21 @@ DEFAULT_FUELS = [
 
 
 def init_fuel_types(db: Session):
-    """
-    Создаёт справочник видов топлива, если он пустой.
-    """
     existing = db.query(FuelType).count()
     if existing > 0:
         return
 
-    for code, name in DEFAULT_FUELS:
+    fuel_types = [
+        ("AI92", "Аи-92"),
+        ("AI95", "Аи-95"),
+        ("DIESEL", "ДТ"),
+        ("GAS", "Газ"),
+    ]
+
+    for code, name in fuel_types:
         db.add(FuelType(code=code, name=name))
 
     db.commit()
-    print("[INIT] fuel_types заполнены.")
-
 def init_db(db: Session):
     """
     Запускается при старте приложения.

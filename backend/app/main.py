@@ -24,8 +24,12 @@ def startup_event():
         # 2. Проверяем нужно ли обновить данные
         if need_update(db):
             print("[INFO] Обновление данных: прошло > 12 часов → запускаем парсер…")
-            run_full_parsing(db)
-        else:
-            print("[INFO] Данные свежие — парсер не требуется.")
+            try:
+                run_full_parsing(db)
+            except Exception as e:
+                print("[WARN] Parser failed during startup:", e)
+
+            else:
+                print("[INFO] Данные свежие — парсер не требуется.")
     finally:
         db.close()

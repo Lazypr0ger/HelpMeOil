@@ -1,20 +1,13 @@
-from sqlalchemy import Column, Integer, String, Float
+from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import relationship
-
 from app.core.database import Base
 
 
 class City(Base):
     __tablename__ = "cities"
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, unique=True, nullable=False, index=True)
-    lat = Column(Float, nullable=True)
-    lon = Column(Float, nullable=True)
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False, unique=True)
 
-    competitor_stations = relationship(
-        "CompetitorStation", back_populates="city", cascade="all, delete-orphan"
-    )
-    our_stations = relationship(
-        "OurStation", back_populates="city", cascade="all, delete-orphan"
-    )
+    competitor_stations = relationship("CompetitorStation", back_populates="city")
+    our_stations = relationship("OurStation", back_populates="city")
