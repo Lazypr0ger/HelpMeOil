@@ -13,7 +13,7 @@ from app.models.station import CompetitorStation
 from app.models.fuel import FuelType
 from app.models.price import FuelPrice, StationType
 from app.models.station import OurStation
-
+from app.services.pricing_service import generate_recommended_prices
 
 HISTORY_DIR = os.path.join(os.getcwd(), "app", "history")
 
@@ -176,7 +176,7 @@ def run_full_parsing(db: Session, region: int = 46) -> pd.DataFrame:
 
     # ---------- 5. Пишем в БД ----------
     write_to_database(df, db)
-
+    generate_recommended_prices(db)
     return df
 
 

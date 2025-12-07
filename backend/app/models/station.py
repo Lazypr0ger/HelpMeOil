@@ -25,3 +25,9 @@ class OurStation(Base):
 
     city = relationship("City", back_populates="our_stations")
     prices = relationship("FuelPrice", back_populates="our_station")
+    recommended_prices = relationship(
+    "RecommendedPrice",
+    back_populates="station",
+    cascade="all, delete-orphan"
+)
+
