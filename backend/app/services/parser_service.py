@@ -1,166 +1,144 @@
-from ..utils.geolocation import geocode_address, detect_city_from_point
-from ..models.models import CompetitorStation, FuelPrice, City
-from sqlalchemy.orm import Session
-from datetime import datetime
-import requests
-from bs4 import BeautifulSoup
-import requests
-from math import radians, cos, sin, asin, sqrt
 import os
+import pandas as pd
+import datetime
+from typing import List, Dict
 
-BASE_URL = "https://russiabase.ru/prices?region=46"
-YANDEX_API_KEY = os.getenv("YANDEX_API_KEY")
-def geocode_address(address: str):
-    if not YANDEX_API_KEY:
-        print("⚠ Нет Yandex API KEY")
-        return None
-
-    url = "https://geocode-maps.yandex.ru/1.x/"
-    params = {
-        "apikey": YANDEX_API_KEY,
-        "format": "json",
-        "geocode": address
-    }
-
-    resp = requests.get(url, params=params)
-    data = resp.json()
-
-    try:
-        pos = data["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]["Point"]["pos"]
-        lon, lat = map(float, pos.split(" "))
-        return lat, lon
-    except:
-        return None
-def haversine(lat1, lon1, lat2, lon2):
-    R = 6371  # радиус земли в км
-    dlat = radians(lat2 - lat1)
-    dlon = radians(lon2 - lon1)
-    a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon/2)**2
-    c = 2 * asin(sqrt(a))
-    return R * c
-def detect_city_by_coords(db, lat, lon):
-    cities = db.query(City).all()
-    closest_city = None
-    min_dist = 99999
-
-    for c in cities:
-        dist = haversine(lat, lon, c.lat, c.lon)
-        if dist < min_dist:
-            min_dist = dist
-            closest_city = c
-
-    # если заправка дальше 7 км → считаем "трассой" и НЕ сохраняем
-    if min_dist > 7:
-        return None
-
-    return closest_city.id
-
-def fetch_page(page: int = 1):
-    url = BASE_URL if page == 1 else f"{BASE_URL}&page={page}"
-    response = requests.get(url, timeout=10)
-
-    return BeautifulSoup(response.text, "html.parser") if response.status_code == 200 else None
+from app.services.html_parser import get_all_pages
+from app.models.city import City
+from app.models.station import CompetitorStation
+from app.models.fuel import FuelType
+from app.models.price import FuelPrice, StationType
 
 
-def parse_card(card):
-    name = card.select_one(".ListingCard_name__O9sxw")
-    name = name.text.strip() if name else "АЗС"
+def run_full_parsing(db):
+    raw = get_all_pages(region=46)
 
-    brand_logo = card.select_one(".ListingCard_logo___8VJR img")
-    brand = brand_logo["alt"] if brand_logo and brand_logo.has_attr("alt") else "АЗС"
+    df = pd.DataFrame([
+        {
+            "station_name": item["station_name"],
+            "city": item["city"],
+            "AI92": item["prices"]["AI92"],
+            "AI95": item["prices"]["AI95"],
+            "DIESEL": item["prices"]["DIESEL"],
+            "GAS": item["prices"]["GAS"],
+        }
+        for item in raw
+    ])
 
-    address = card.select_one(".ListingCard_iconBlockText___egMo")
-    address = address.text.strip() if address else ""
+    # === 1. Удаляем строки без города ===
+    df = df.dropna(subset=["city"])
 
-    prices = {}
-    blocks = card.select(".PricesListNew_block__4lVEL")
+    fuel_cols = ["AI92", "AI95", "DIESEL", "GAS"]
 
-    for b in blocks:
-        t = b.select_one(".PricesListNew_blockLabel__FyFeq")
-        p = b.select_one("p")
+    # === 2. Приводим к числам + превращаем нули в NaN ===
+    for col in fuel_cols:
+        df[col] = pd.to_numeric(df[col], errors="coerce")  # пустые/мусор → NaN
+        # нули считаем отсутствующими данными
+        df.loc[df[col] == 0, col] = pd.NA
 
-        if t and p:
-            fuel = t.text.strip()
-            price = p.text.replace("р.", "").replace(",", ".").strip()
+    # === 3. Заполняем медианами по ГОРОДУ и ВИДУ ТОПЛИВА ===
+    def fill_group(group):
+        medians = group[fuel_cols].median()
+        for col in fuel_cols:
+            group[col] = group[col].fillna(medians[col])
+        return group
 
-            try:
-                prices[fuel] = float(price)
-            except:
-                pass
+    df = df.groupby("city", group_keys=False).apply(fill_group)
 
-    return {
-        "station_name": name,
-        "brand": brand,
-        "address": address,
-        "prices": prices,
-    }
+    # дальше как раньше:
+    save_dataframe_to_history(df)
+    write_to_database(df, db)
+    return df
 
 
-def run_full_parsing(db: Session):
-    page = 1
-    added = 0
-    price_count = 0
 
-    while True:
-        soup = fetch_page(page)
-        if not soup:
-            break
+def save_dataframe_to_history(df: pd.DataFrame):
+    """
+    Сохраняет датафрейм в папку app/history/ с именем вида:
+    2025-12-07_14-00.csv
+    """
+    folder = os.path.join(os.getcwd(), "app", "history")
+    os.makedirs(folder, exist_ok=True)
 
-        cards = soup.select(".ListingCard_orgCard__xCwyi")
-        if not cards:
-            break
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
+    filename = f"{timestamp}.csv"
+    filepath = os.path.join(folder, filename)
 
-        for card in cards:
-            data = parse_card(card)
+    df.to_csv(filepath, index=False)
 
-            # 1 — получаем координаты
-            coords = geocode_address(data["address"])
+    print(f"[OK] Датасет сохранён в history: {filename}")
 
-            if not coords:
+
+def write_to_database(df: pd.DataFrame, db):
+    today = datetime.date.today()
+
+    # Подгружаем справочник видов топлива
+    fuel_map = {f.code: f.id for f in db.query(FuelType).all()}
+
+    for _, row in df.iterrows():
+
+        # === (1) Город ===
+        city = db.query(City).filter(City.name.ilike(row.city)).first()
+        if not city:
+            city = City(name=row.city)
+            db.add(city)
+            db.commit()
+            db.refresh(city)
+
+        # === (2) Станция ===
+        station = (
+            db.query(CompetitorStation)
+              .filter(
+                  CompetitorStation.station_name.ilike(row.station_name),
+                  CompetitorStation.city_id == city.id
+              )
+              .first()
+        )
+
+        if not station:
+            station = CompetitorStation(
+                station_name=row.station_name,
+                brand=None,
+                address=None,
+                city_id=city.id
+            )
+            db.add(station)
+            db.commit()
+            db.refresh(station)
+
+        # === (3) Пишем цены ===
+        for fuel_code in ["AI92", "AI95", "DIESEL", "GAS"]:
+            value = row[fuel_code]
+
+            if pd.isna(value):
                 continue
 
-            lat, lon = coords
+            fuel_id = fuel_map.get(fuel_code)
 
-            # 2 — определяем город
-            city_id = detect_city_from_point(db, lat, lon)
+            # Проверяем: есть ли цена за сегодняшнюю дату?
+            exists = (
+                db.query(FuelPrice)
+                  .filter(
+                      FuelPrice.station_type == StationType.competitor,
+                      FuelPrice.competitor_station_id == station.id,
+                      FuelPrice.fuel_type_id == fuel_id,
+                      FuelPrice.date == today
+                  )
+                  .first()
+            )
 
-            if not city_id:
-                continue  # не сохраняем трассовые / областные станции
+            if exists:
+                continue  # не заливаем дубли
 
-            # 3 — ищем или создаём станцию
-            station = db.query(CompetitorStation).filter(
-                CompetitorStation.station_name == data["station_name"]
-            ).first()
+            db.add(FuelPrice(
+                station_id=station.id,
+                station_type=StationType.competitor,
+                competitor_station_id=station.id,
+                fuel_type_id=fuel_id,
+                price=float(value),
+                date=today
+            ))
 
-            if not station:
-                station = CompetitorStation(
-                    station_name=data["station_name"],
-                    brand=data["brand"],
-                    address=data["address"],
-                    lat=lat,
-                    lon=lon,
-                    city_id=city_id
-                )
-                db.add(station)
-                db.commit()
-                db.refresh(station)
-                added += 1
+    db.commit()
+    print("[OK] Данные успешно записаны в PostgreSQL.")
 
-            # 4 — сохраняем цены
-            timestamp = datetime.now()
-
-            for fuel, price in data["prices"].items():
-                entry = FuelPrice(
-                    station_id=station.id,
-                    fuel_type=fuel,
-                    price=price,
-                    timestamp=timestamp,
-                )
-                db.add(entry)
-                price_count += 1
-
-            db.commit()
-
-        page += 1
-
-    return {"stations_added": added, "prices_added": price_count}

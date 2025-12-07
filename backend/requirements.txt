@@ -1,5 +1,8 @@
 fastapi
-uvicorn
+uvicorn[standard]
 sqlalchemy
 psycopg2-binary
-python-dotenv
+python-dotenv    # если захочешь хранить конфиг в .env
+pydantic-settings
+beautifulsoup4
+pandas
