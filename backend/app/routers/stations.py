@@ -1,73 +1,93 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
 from ..db.database import get_db
-from ..models.models import District, OurStation, CompetitorStation, FuelPrice
+from ..models.models import City, OurStation, CompetitorStation, FuelPrice
 
 router = APIRouter()
 
-# ==========================================================
-#                1. Получить наши АЗС (GET /stations/our)
-# ==========================================================
+
+# ---------------------------------------------------------
+# 1. Список городов
+# ---------------------------------------------------------
+@router.get("/cities")
+def get_cities(db: Session = Depends(get_db)):
+    return db.query(City).all()
+
+
+@router.post("/cities")
+def create_city(name: str, lat: float, lon: float, db: Session = Depends(get_db)):
+    city = City(name=name, lat=lat, lon=lon)
+    db.add(city)
+    db.commit()
+    db.refresh(city)
+    return city
+
+
+# ---------------------------------------------------------
+# 2. Наши станции
+# ---------------------------------------------------------
 @router.get("/our")
 def get_our_stations(db: Session = Depends(get_db)):
     stations = db.query(OurStation).all()
 
-    # Добавим название района (чтобы фронтенд мог показать district)
     result = []
     for st in stations:
-        district = db.query(District).filter(District.id == st.district_id).first()
+        city = db.query(City).filter(City.id == st.city_id).first()
         result.append({
             "id": st.id,
             "name": st.name,
-            "district": district.name if district else "Не указан",
+            "city": city.name if city else None
         })
 
     return result
 
 
-# ==========================================================
-#           2. Получить одну АЗС (GET /stations/our/{id})
-# ==========================================================
 @router.get("/our/{station_id}")
 def get_one_our_station(station_id: int, db: Session = Depends(get_db)):
-    station = db.query(OurStation).filter(OurStation.id == station_id).first()
-    if not station:
-        raise HTTPException(404, "Our station not found")
+    st = db.query(OurStation).filter(OurStation.id == station_id).first()
+    if not st:
+        raise HTTPException(404, "station not found")
 
-    district = db.query(District).filter(District.id == station.district_id).first()
+    city = db.query(City).filter(City.id == st.city_id).first()
 
     return {
-        "id": station.id,
-        "name": station.name,
-        "district": district.name if district else "Не указан"
+        "id": st.id,
+        "name": st.name,
+        "city": city.name if city else None
     }
 
 
-# ==========================================================
-#     3. Получить конкурентов + их последние цены
-#        (GET /stations/competitors?district=Засвияжский)
-# ==========================================================
+@router.post("/our")
+def add_our_station(name: str, city_id: int, db: Session = Depends(get_db)):
+    st = OurStation(name=name, city_id=city_id)
+    db.add(st)
+    db.commit()
+    db.refresh(st)
+    return st
+
+
+# ---------------------------------------------------------
+# 3. Конкуренты — по городам
+# ---------------------------------------------------------
 @router.get("/competitors")
-def get_competitors(district: str, db: Session = Depends(get_db)):
-    district_obj = db.query(District).filter(District.name == district).first()
-    if not district_obj:
+def get_competitors(city: str, db: Session = Depends(get_db)):
+    city_obj = db.query(City).filter(City.name == city).first()
+    if not city_obj:
         return []
 
-    competitors = (
-        db.query(CompetitorStation)
-        .filter(CompetitorStation.district_id == district_obj.id)
-        .all()
-    )
+    competitors = db.query(CompetitorStation).filter(
+        CompetitorStation.city_id == city_obj.id
+    ).all()
 
     result = []
 
     for c in competitors:
-        latest_prices = {}
+        row = {"station_name": c.station_name}
 
         for fuel in ["Аи-92", "Аи-95", "Аи-95+", "Аи-98", "ДТ", "Газ"]:
-            price_obj = (
+            last_price = (
                 db.query(FuelPrice)
                 .filter(
                     FuelPrice.station_id == c.id,
@@ -77,60 +97,26 @@ def get_competitors(district: str, db: Session = Depends(get_db)):
                 .first()
             )
 
-            latest_prices[fuel] = (
-                float(price_obj.price) if price_obj else None
-            )
+            row[fuel] = float(last_price.price) if last_price else None
 
-        result.append({
-            "station_name": c.station_name,
-            **latest_prices
-        })
+        result.append(row)
 
     return result
 
 
-# ==========================================================
-#        4. Добавить наш район (POST /stations/district)
-# ==========================================================
-@router.post("/district")
-def add_district(name: str, db: Session = Depends(get_db)):
-    district = District(name=name)
-    db.add(district)
-    db.commit()
-    db.refresh(district)
-    return district
-
-
-# ==========================================================
-#        5. Добавить нашу АЗС (POST /stations/our)
-# ==========================================================
-@router.post("/our")
-def add_our_station(name: str, district_id: int, db: Session = Depends(get_db)):
-    station = OurStation(name=name, district_id=district_id)
-    db.add(station)
-    db.commit()
-    db.refresh(station)
-    return station
-
-
-# ==========================================================
-#   6. Добавить станцию-конкурента (POST /stations/competitor)
-# ==========================================================
+# ---------------------------------------------------------
+# 4. Создать конкурента вручную
+# ---------------------------------------------------------
 @router.post("/competitor")
-def add_competitor(
-    station_name: str,
-    brand: str,
-    address: str,
-    district_id: int,
-    db: Session = Depends(get_db)
-):
-    competitor = CompetitorStation(
+def add_competitor(station_name: str, brand: str, address: str, city_id: int,
+                   db: Session = Depends(get_db)):
+    st = CompetitorStation(
         station_name=station_name,
         brand=brand,
         address=address,
-        district_id=district_id,
+        city_id=city_id
     )
-    db.add(competitor)
+    db.add(st)
     db.commit()
-    db.refresh(competitor)
-    return competitor
+    db.refresh(st)
+    return st

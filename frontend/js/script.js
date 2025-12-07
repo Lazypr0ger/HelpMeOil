@@ -1,73 +1,70 @@
 /* ======================================================
-   ГЛАВНАЯ ЛОГИКА ФРОНТЕНДА: SCRIPT.JS
+   ЛОГИКА ФРОНТЕНДА
    ====================================================== */
 
-/* ===============================
-   1. Загрузка списка наших АЗС (index.html)
-   =============================== */
+
+/* ==============================================
+   1. Загрузка списка НАШИХ станций на index.html
+   ============================================== */
 async function loadOurStations() {
     const container = document.getElementById("stationsList");
     if (!container) return;
 
     const stations = await apiGetOurStations();
     if (!stations || stations.length === 0) {
-        container.innerHTML = "<p class='text-secondary'>Нет данных</p>";
+        container.innerHTML = "<p class='text-secondary'>Нет станций</p>";
         return;
     }
 
     container.innerHTML = "";
-
     stations.forEach(st => {
-        const card = document.createElement("div");
-        card.className = "col-md-4 mb-4";
+        container.innerHTML += `
+            <div class="col-md-4 mb-4">
+                <div class="card custom-card p-3">
+                    <h4 class="text-light">${st.name}</h4>
+                    <p class="text-secondary">${st.city}</p>
 
-        card.innerHTML = `
-            <div class="card custom-card p-3">
-                <h4 class="text-light">${st.name}</h4>
-                <p class="text-secondary">${st.district}</p>
-                <a href="station.html?id=${st.id}" class="btn btn-success w-100">Открыть</a>
+                    <a href="station.html?id=${st.id}" class="btn btn-success w-100">
+                        Открыть
+                    </a>
+                </div>
             </div>
         `;
-
-        container.appendChild(card);
     });
 }
 
 
-/* ===============================
-   2. Загрузка данных выбранной станции (station.html)
-   =============================== */
+/* ==============================================
+   2. Загрузка данных страницы station.html
+   ============================================== */
 async function loadStationPage() {
-    const nameEl = document.getElementById("stationName");
-    if (!nameEl) return; // мы не на этой странице
+    const title = document.getElementById("stationName");
+    if (!title) return;
 
-    // Достаём ID из URL
     const params = new URLSearchParams(window.location.search);
     const id = params.get("id");
-    if (!id) return;
 
-    const station = await apiGetOurStation(id);
-    if (!station) {
-        nameEl.textContent = "Ошибка загрузки";
+    const st = await apiGetOurStation(id);
+    if (!st) {
+        title.textContent = "Ошибка загрузки";
         return;
     }
 
-    // Заполняем данные
-    document.getElementById("stationName").textContent = station.name;
-    document.getElementById("stationDistrict").textContent = station.district;
+    document.getElementById("stationName").textContent = st.name;
+    document.getElementById("stationCity").textContent = st.city;
 
     // Загружаем конкурентов
-    loadCompetitors(station.district);
+    loadCompetitors(st.city);
 
     // Загружаем рекомендованную цену
     loadRecommendedPrice(id);
 }
 
 
-/* ===============================
-   3. Загрузка конкурентов в таблицу (station.html)
-   =============================== */
-async function loadCompetitors(district) {
+/* ==============================================
+   3. Конкуренты в городе
+   ============================================== */
+async function loadCompetitors(city) {
     const table = document.getElementById("competitorsTable");
     if (!table) return;
 
@@ -75,8 +72,7 @@ async function loadCompetitors(district) {
         <tr><td colspan="7" class="text-center text-secondary">Загрузка...</td></tr>
     `;
 
-    const competitors = await apiGetCompetitorsByDistrict(district);
-
+    const competitors = await apiGetCompetitorsByCity(city);
     if (!competitors || competitors.length === 0) {
         table.innerHTML = `
             <tr><td colspan="7" class="text-center text-secondary">Нет данных</td></tr>
@@ -85,7 +81,6 @@ async function loadCompetitors(district) {
     }
 
     table.innerHTML = "";
-
     competitors.forEach(c => {
         table.innerHTML += `
             <tr>
@@ -102,29 +97,29 @@ async function loadCompetitors(district) {
 }
 
 
-/* ===============================
-   4. Рекомендуемая цена (station.html)
-   =============================== */
-async function loadRecommendedPrice(id) {
-    const el = document.getElementById("recommendedPrice");
-    if (!el) return;
+/* ==============================================
+   4. Рекомендованная цена
+   ============================================== */
+async function loadRecommendedPrice(stationId) {
+    const block = document.getElementById("recommendedPrice");
+    if (!block) return;
 
-    const result = await apiGetRecommendedPrice(id);
+    const res = await apiGetRecommendedPrice(stationId);
 
-    if (!result || !result.price) {
-        el.textContent = "Нет данных";
-        el.classList.remove("text-success");
-        el.classList.add("text-secondary");
+    if (!res || res.price === null) {
+        block.textContent = "Нет данных";
+        block.classList.remove("text-success");
+        block.classList.add("text-secondary");
         return;
     }
 
-    el.textContent = result.price + " ₽";
+    block.textContent = res.price + " ₽";
 }
 
 
-/* ===============================
-   5. Автоматическое определение страницы
-   =============================== */
+/* ==============================================
+   5. Автоматический запуск
+   ============================================== */
 document.addEventListener("DOMContentLoaded", () => {
     loadOurStations();
     loadStationPage();
