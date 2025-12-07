@@ -1,14 +1,60 @@
 console.log("SCRIPT LOADED");
-console.log("SCRIPT STARTED");
+let chartAvg = null;
+let chartDyn = null;
 
 document.addEventListener("DOMContentLoaded", () => {
-    console.log("DOM READY — calling loadStations()");
+    console.log("SCRIPT STARTED");
+
+    const btn = document.getElementById("forceUpdateBtn");
+    if (btn) btn.addEventListener("click", onForceUpdateClick);
+
     loadStations();
     loadMarketAnalytics();
 });
 
+/* ------------------------------------------------------------------------
+    СПИННЕРЫ (С БЕЗОПАСНОЙ ПРОВЕРКОЙ ЧТО ЭЛЕМЕНТ СУЩЕСТВУЕТ)
+------------------------------------------------------------------------ */
+
+function showLoading() {
+    const sOver = document.getElementById("stationsOverlay");
+    const sWrap = document.getElementById("stationsWrapper");
+    const aOver = document.getElementById("analyticsOverlay");
+    const aWrap = document.getElementById("analyticsWrapper");
+
+    if (sOver && sWrap) {
+        sOver.style.display = "flex";
+        sWrap.classList.add("loading-blur");
+    }
+
+    if (aOver && aWrap) {
+        aOver.style.display = "flex";
+        aWrap.classList.add("loading-blur");
+    }
+}
+
+function hideLoading() {
+    const sOver = document.getElementById("stationsOverlay");
+    const sWrap = document.getElementById("stationsWrapper");
+    const aOver = document.getElementById("analyticsOverlay");
+    const aWrap = document.getElementById("analyticsWrapper");
+
+    if (sOver && sWrap) {
+        sOver.style.display = "none";
+        sWrap.classList.remove("loading-blur");
+    }
+
+    if (aOver && aWrap) {
+        aOver.style.display = "none";
+        aWrap.classList.remove("loading-blur");
+    }
+}
+
+/* ------------------------------------------------------------------------
+    ЗАГРУЗКА СПИСКА НАШИХ АЗС
+------------------------------------------------------------------------ */
+
 async function loadStations() {
-     console.log("loadStations() CALLED");
     const container = document.getElementById("stationsContainer");
     const counter = document.getElementById("stationsCount");
 
@@ -17,7 +63,7 @@ async function loadStations() {
     try {
         const data = await getOurStations();
 
-        if (!Array.isArray(data) || data.length === 0) {
+        if (!data.length) {
             container.innerHTML = `<div class="text-warning">Станции не найдены.</div>`;
             counter.textContent = "0 станций";
             return;
@@ -37,19 +83,10 @@ async function loadStations() {
                 window.location.href = `station.html?id=${station.id}`;
             });
 
-            const title = document.createElement("div");
-            title.className = "card-title";
-            title.textContent = station.name;
-
-            const subtitle = document.createElement("div");
-            subtitle.className = "card-address";
-            const city = station.city_name || "";
-            const addr = station.address || "";
-            subtitle.textContent = city ? `${city}${addr ? " · " + addr : ""}` : addr;
-
-
-            card.appendChild(title);
-            card.appendChild(subtitle);
+            card.innerHTML = `
+                <div class="card-title">${station.name}</div>
+                <div class="card-address">${station.city_name || ""} · ${station.address || ""}</div>
+            `;
 
             col.appendChild(card);
             container.appendChild(col);
@@ -57,76 +94,102 @@ async function loadStations() {
 
     } catch (err) {
         console.error(err);
-        container.innerHTML = `<div class="text-danger">Ошибка при загрузке станций</div>`;
-        if (counter) counter.textContent = "";
+        container.innerHTML = `<div class="text-danger">Ошибка загрузки станций</div>`;
     }
 }
+
+/* ------------------------------------------------------------------------
+    ЗАГРУЗКА АНАЛИТИКИ
+------------------------------------------------------------------------ */
 
 async function loadMarketAnalytics() {
     const avgCanvas = document.getElementById("marketAvgChart");
     const dynCanvas = document.getElementById("marketDynamicsChart");
-
     if (!avgCanvas || !dynCanvas) return;
 
     try {
         const avgData = await getMarketAverages();
         const historyData = await getMarketHistory();
 
-        /* --------------------------
-           1. СРЕДНИЕ ЦЕНЫ (бар-чарт)
-        --------------------------- */
-
         const fuels = ["AI92", "AI95", "DIESEL", "GAS"];
-        const avgValues = fuels.map(code => avgData[code] ?? null);
 
-        new Chart(avgCanvas.getContext("2d"), {
+        // 🧹 Уничтожаем старые графики
+        if (chartAvg) chartAvg.destroy();
+        if (chartDyn) chartDyn.destroy();
+
+        // 📊 Создаём новый график №1
+        chartAvg = new Chart(avgCanvas, {
             type: "bar",
             data: {
                 labels: fuels,
                 datasets: [{
                     label: "Средняя цена, ₽",
-                    data: avgValues,
+                    data: fuels.map(f => avgData[f] ?? null)
                 }]
             },
-            options: {
-                plugins: { legend: { labels: { color: "#fff" } } },
-                scales: {
-                    x: { ticks: { color: "#ccc" }, grid: { color: "#333" } },
-                    y: { ticks: { color: "#ccc" }, grid: { color: "#333" } },
-                }
-            }
+            options: chartOptions
         });
 
-        /* --------------------------------
-           2. ДИНАМИКА РЫНКА (line chart)
-        -------------------------------- */
-
-        const labels = historyData.map(r => r.date);
-
-        const datasets = fuels.map((fuel, index) => ({
-            label: fuel,
-            data: historyData.map(r => r[fuel]),
-            borderWidth: 2,
-            fill: false,
-            borderDash: index === 0 ? [] : index === 1 ? [5, 5] : index === 2 ? [3, 3] : [8, 4],
-        }));
-
-        new Chart(dynCanvas.getContext("2d"), {
+        // 📈 Новый график №2
+        chartDyn = new Chart(dynCanvas, {
             type: "line",
             data: {
-                labels,
-                datasets
+                labels: historyData.map(r => r.date),
+                datasets: fuels.map((f, i) => ({
+                    label: f,
+                    data: historyData.map(r => r[f]),
+                    borderWidth: 2,
+                    fill: false,
+                    borderDash: i === 0 ? [] : i === 1 ? [5,5] : i === 2 ? [3,3] : [8,4]
+                }))
             },
-            options: {
-                plugins: { legend: { labels: { color: "#fff" } } },
-                scales: {
-                    x: { ticks: { color: "#ccc" }, grid: { color: "#333" } },
-                    y: { ticks: { color: "#ccc" }, grid: { color: "#333" } },
-                }
-            }
+            options: chartOptions
         });
 
     } catch (err) {
         console.error("Ошибка аналитики:", err);
     }
+}
+
+const chartOptions = {
+    plugins: { legend: { labels: { color: "#fff" } } },
+    scales: {
+        x: { ticks: { color: "#ccc" }, grid: { color: "#333" } },
+        y: { ticks: { color: "#ccc" }, grid: { color: "#333" } }
+    }
+};
+
+/* ------------------------------------------------------------------------
+    КНОПКА "ОБНОВИТЬ ДАННЫЕ"
+------------------------------------------------------------------------ */
+
+async function onForceUpdateClick() {
+    const btn = document.getElementById("forceUpdateBtn");
+    if (!btn) return;
+
+    btn.disabled = true;
+    const old = btn.textContent;
+    btn.textContent = "Обновление…";
+
+    showLoading();
+
+    try {
+        await forceUpdate();
+
+        btn.textContent = "Обновлено ✓";
+
+        await loadStations();
+        await loadMarketAnalytics();
+
+    } catch (e) {
+        console.error("Ошибка:", e);
+        btn.textContent = "Ошибка ❌";
+    }
+
+    hideLoading();
+
+    setTimeout(() => {
+        btn.disabled = false;
+        btn.textContent = old;
+    }, 1500);
 }

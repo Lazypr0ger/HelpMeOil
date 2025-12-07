@@ -1,114 +1,91 @@
 // frontend/station.js
+console.log("STATION JS LOADED");
+let chartHistory = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
-    const stationId = getStationIdFromUrl();
-    if (!stationId) {
-        alert("Не указан id станции в URL");
-        return;
-    }
+    const id = getId();
+    if (!id) return alert("ID станции не указан");
 
-    await loadStation(stationId);
-    await loadCompetitors(stationId);
-    await loadPriceHistory(stationId);
-    await loadRecommended(stationId);        // ← добавлено
-    await loadRecommendedHistory(stationId); // ← добавлено
-    await loadCityAvg(stationId);            // ← добавлено (если будет плашка)
+    await loadStation(id);
+    await loadRecommended(id);
+    await loadCompetitors(id);
+    await loadPriceHistory(id);
+    await loadRecommendedHistory(id);
+    await loadCityAvg(id);
 });
 
-function getStationIdFromUrl() {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("id");
+function getId() {
+    return new URLSearchParams(location.search).get("id");
 }
 
-/* ---------------------------------------------------
-   1. ЗАГРУЗКА ОСНОВНЫХ ДАННЫХ АЗС
---------------------------------------------------- */
+/* ------------------ ОСНОВНАЯ ИНФОРМАЦИЯ ------------------ */
+
 async function loadStation(id) {
-    const nameEl = document.getElementById("stationName");
-    const addrEl = document.getElementById("stationAddress");
+    const name = document.getElementById("stationName");
+    const addr = document.getElementById("stationAddress");
 
     try {
         const data = await getStationDetails(id);
-
-        nameEl.textContent = data.name || "АЗС";
-        addrEl.textContent = `${data.city_name || ""} · ${data.address || ""}`;
-
-    } catch (err) {
-        console.error("Ошибка загрузки станции:", err);
-        nameEl.textContent = "Ошибка загрузки станции";
+        name.textContent = data.name;
+        addr.textContent = `${data.city_name} · ${data.address}`;
+    } catch (e) {
+        console.error(e);
+        name.textContent = "Ошибка загрузки";
     }
 }
 
-/* ---------------------------------------------------
-   2. РЕКОМЕНДУЕМЫЕ ЦЕНЫ
---------------------------------------------------- */
+/* ------------------ РЕКОМЕНДУЕМЫЕ ------------------ */
+
 async function loadRecommended(id) {
-    const container = document.getElementById("recommendedPrices");
-    container.innerHTML = `<div class="text-secondary">Загрузка…</div>`;
+    const box = document.getElementById("recommendedPrices");
+    box.innerHTML = "<div class='text-secondary'>Загрузка…</div>";
 
     try {
         const rec = await apiGet(`/our-stations/${id}/recommended`);
-        container.innerHTML = "";
+        box.innerHTML = "";
 
-        const fuels = ["AI92", "AI95", "DIESEL", "GAS"];
-
-        fuels.forEach(code => {
-            if (rec[code] != null) {
-                const col = document.createElement("div");
-                col.className = "col-md-3";
-
-                col.innerHTML = `
+        ["AI92","AI95","DIESEL","GAS"].forEach(f => {
+            if (rec[f] != null) {
+                box.innerHTML += `
+                <div class="col-md-3">
                     <div class="card-station">
-                        <div class="card-title">${code}</div>
-                        <div class="mt-2">${rec[code].toFixed(2)} ₽</div>
+                        <div class="card-title">${f}</div>
+                        <div class="mt-2">${rec[f].toFixed(2)} ₽</div>
                     </div>
-                `;
-                container.appendChild(col);
+                </div>`;
             }
         });
-
-    } catch (err) {
-        console.error("Ошибка рекомендованных цен:", err);
-        container.innerHTML = `<div class="text-danger">Не удалось загрузить данные</div>`;
+    } catch (e) {
+        console.error("Ошибка рекомендованных:", e);
     }
 }
 
-/* ---------------------------------------------------
-   3. КОНКУРЕНТЫ
---------------------------------------------------- */
+/* ------------------ КОНКУРЕНТЫ ------------------ */
+
 async function loadCompetitors(id) {
     const tbody = document.querySelector("#competitorsTable tbody");
     tbody.innerHTML = `<tr><td colspan="5" class="text-secondary">Загрузка…</td></tr>`;
 
     try {
-        const data = await getStationCompetitors(id);
-
-        if (!data.length) {
-            tbody.innerHTML = `<tr><td colspan="5" class="text-warning">Нет конкурентов</td></tr>`;
-            return;
-        }
-
+        const comps = await getStationCompetitors(id);
         tbody.innerHTML = "";
 
-        data.forEach(row => {
-            const tr = document.createElement("tr");
-            const fuels = ["AI92", "AI95", "DIESEL", "GAS"];
+        const fuels = ["AI92","AI95","DIESEL","GAS"];
 
-            tr.innerHTML = `<td>${row.station_name}</td>` +
-                fuels.map(code => `<td>${row.prices?.[code] ? row.prices[code].toFixed(2) : "—"}</td>`).join("");
-
-            tbody.appendChild(tr);
+        comps.forEach(c => {
+            tbody.innerHTML += `
+            <tr>
+                <td>${c.station_name}</td>
+                ${fuels.map(f => `<td>${c.prices[f]?.toFixed?.(2) ?? "—"}</td>`).join("")}
+            </tr>`;
         });
-
-    } catch (err) {
-        console.error("Ошибка конкурентов:", err);
-        tbody.innerHTML = `<tr><td colspan="5" class="text-danger">Ошибка загрузки</td></tr>`;
+    } catch (e) {
+        console.error("Ошибка конкурентов:", e);
     }
 }
 
-/* ---------------------------------------------------
-   4. ИСТОРИЯ ЦЕН НАШЕЙ АЗС
---------------------------------------------------- */
+/* ------------------ ГРАФИК ------------------ */
+
 async function loadPriceHistory(id) {
     const canvas = document.getElementById("priceHistoryChart");
     if (!canvas) return;
@@ -117,22 +94,27 @@ async function loadPriceHistory(id) {
         const data = await getStationPriceHistory(id);
         if (!data.length) return;
 
-        const labels = data.map(d => d.date);
         const fuels = ["AI92", "AI95", "DIESEL", "GAS"];
 
-        const datasets = fuels.map((code, idx) => ({
-            label: code,
-            data: data.map(d => d[code]),
-            borderWidth: 2,
-            fill: false,
-            borderDash: idx === 0 ? [] : idx === 1 ? [5, 5] : idx === 2 ? [3, 3] : [8, 4]
-        }));
+        // 🧹 Уничтожаем старый график
+        if (chartHistory) chartHistory.destroy();
 
-        new Chart(canvas.getContext("2d"), {
+        chartHistory = new Chart(canvas, {
             type: "line",
-            data: { labels, datasets },
+            data: {
+                labels: data.map(d => d.date),
+                datasets: fuels.map((code, idx) => ({
+                    label: code,
+                    data: data.map(d => d[code]),
+                    borderWidth: 2,
+                    fill: false,
+                    borderDash: idx === 0 ? [] : idx === 1 ? [5,5] : idx === 2 ? [3,3] : [8,4]
+                }))
+            },
             options: {
-                plugins: { legend: { labels: { color: "#fff" } } },
+                plugins: { 
+                    legend: { labels: { color: "#fff" } }
+                },
                 scales: {
                     x: { ticks: { color: "#ccc" }, grid: { color: "#333" } },
                     y: { ticks: { color: "#ccc" }, grid: { color: "#333" } }
@@ -145,18 +127,13 @@ async function loadPriceHistory(id) {
     }
 }
 
-/* ---------------------------------------------------
-   5. РЕКОМЕНДУЕМЫЕ ЦЕНЫ — ИСТОРИЯ
---------------------------------------------------- */
+
+/* ------------------ ДОПОЛНИТЕЛЬНОЕ ------------------ */
+
 async function loadRecommendedHistory(id) {
-    const data = await apiGet(`/our-stations/${id}/recommended/history`);
-    console.log("История рекомендованных:", data);
+    console.log("recommended history:", await apiGet(`/our-stations/${id}/recommended/history`));
 }
 
-/* ---------------------------------------------------
-   6. СРЕДНЯЯ ЦЕНА ПО ГОРОДУ
---------------------------------------------------- */
-async function loadCityAvg(id) {
-    const avg = await apiGet(`/our-stations/${id}/city-avg`);
-    console.log("Средние по городу:", avg);
+async function loadCityAvg(id){
+    console.log("city avg:", await apiGet(`/our-stations/${id}/city-avg`));
 }
