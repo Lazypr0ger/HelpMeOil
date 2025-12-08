@@ -1,15 +1,10 @@
-// ==============================
-// ID станции из URL
-// ==============================
+
 function getStationId() {
     const params = new URLSearchParams(window.location.search);
     return params.get("id");
 }
 
 
-// ==============================
-// Главная функция загрузки данных
-// ==============================
 document.addEventListener("DOMContentLoaded", async () => {
     const id = getStationId();
     if (!id) {
@@ -22,9 +17,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 
-// ==============================
-// Загрузка информации о станции
-// ==============================
 async function loadStationInfo(id) {
     const station = await apiGetOurStation(id);
 
@@ -39,9 +31,6 @@ async function loadStationInfo(id) {
 }
 
 
-// ==============================
-// Загрузка и построение всех графиков
-// ==============================
 async function loadCharts(id) {
     const fuels = ["AI92", "AI95", "DIESEL", "GAS"];
 
@@ -51,9 +40,7 @@ async function loadCharts(id) {
 }
 
 
-// ==============================
-// Построение одного графика топлива
-// ==============================
+
 async function buildChart(stationId, fuel) {
     const ctx = document.getElementById(`chart${fuel}`);
 
@@ -70,7 +57,7 @@ async function buildChart(stationId, fuel) {
     // Фильтр по виду топлива
     const avgFuel = cityAvg.filter(p => p.fuel_type_id && p.fuel_type_id !== null);
 
-    // ============ Преобразуем данные ============
+  
 
     const myData = myHistory.map(r => ({
         x: r.date,
@@ -84,7 +71,7 @@ async function buildChart(stationId, fuel) {
             y: r.avg
         }));
 
-    // ========= Построение графика =========
+
 
     new Chart(ctx, {
         type: "line",
@@ -115,10 +102,7 @@ async function buildChart(stationId, fuel) {
 }
 
 
-// ==============================
-// Маппер fuel -> type_id
-// (ИСПОЛЬЗУЕМ ТЕ ЖЕ ID, КОТОРЫЕ В fuel_types)
-// ==============================
+
 function fuelTypeId(code) {
     switch (code) {
         case "AI92": return 1;

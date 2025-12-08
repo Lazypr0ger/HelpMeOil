@@ -125,14 +125,13 @@ def clean_city_name(raw: str | None) -> Optional[str]:
         return None
     s = raw.strip()
 
-    # убираем ведущие номера вида "21. " или "21 " или "21,"
+
     s = re.sub(r'^\d+[\.,]\s*', '', s)
 
-    # если после этого строка пустая — ничего не возвращаем
+
     if not s:
         return None
 
-    # если строка чисто числовая (типа "60.3") — считаем мусором
     if re.fullmatch(r'\d+([\.,]\d+)?', s):
         return None
 

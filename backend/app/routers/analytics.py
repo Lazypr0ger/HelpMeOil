@@ -38,9 +38,7 @@ def market_history(db: Session = Depends(get_db)):
         .order_by(FuelPrice.date)
         .all()
     )
-
-    # Преобразуем в формат:
-    # [{ date, AI92, AI95, GAS, DIESEL }, ...]
+    
     result = {}
     for date, fuel, avg in rows:
         d = date.isoformat()

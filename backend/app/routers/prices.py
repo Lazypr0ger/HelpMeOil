@@ -20,10 +20,6 @@ router = APIRouter(
     tags=["prices"]
 )
 
-# ------------------------
-#  SCHEMAS
-# ------------------------
-
 class PricePoint(BaseModel):
     timestamp: str
     price: float
@@ -42,13 +38,10 @@ class MarketAvgOut(BaseModel):
     avg_price: float
 
 
-# ===============================================================
-# 1. История цен станции (competitor / our)
-# ===============================================================
 @router.get("/history", response_model=List[FuelHistoryOut])
 def get_price_history(
     station_id: int,
-    station_type: str,   # "competitor" or "our"
+    station_type: str, 
     db: Session = Depends(get_db)
 ):
     if station_type not in ("competitor", "our"):
@@ -64,7 +57,7 @@ def get_price_history(
     if not prices:
         return []
 
-    # группируем по fuel_type
+
     history_map = {}
     for p in prices:
         code = p.fuel_type.code
@@ -78,9 +71,6 @@ def get_price_history(
     ]
 
 
-# ===============================================================
-# 2. Последние цены по станции
-# ===============================================================
 @router.get("/latest", response_model=List[LatestFuelPrice])
 def get_latest_prices(
     station_id: int,
@@ -127,9 +117,6 @@ def get_latest_prices(
     ]
 
 
-# ===============================================================
-# 3. Средняя цена по городу (только конкуренты)
-# ===============================================================
 @router.get("/market/city", response_model=List[MarketAvgOut])
 def get_city_market_avg(
     city_id: int,
@@ -153,9 +140,6 @@ def get_city_market_avg(
     ]
 
 
-# ===============================================================
-# 4. Средняя цена по региону (все конкуренты)
-# ===============================================================
 @router.get("/market/region", response_model=List[MarketAvgOut])
 def get_region_market_avg(db: Session = Depends(get_db)):
     rows = (

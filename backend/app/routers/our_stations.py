@@ -15,10 +15,6 @@ from pydantic import BaseModel
 router = APIRouter(prefix="/our-stations", tags=["our stations"])
 
 
-# --------------------------------------------------
-# NORMALIZATION (единая схема топлива для фронта)
-# --------------------------------------------------
-
 def normalize_code(code: str):
     code = code.upper()
     match code:
@@ -29,10 +25,6 @@ def normalize_code(code: str):
     return code
 
 
-# --------------------------------------------------
-# SCHEMAS
-# --------------------------------------------------
-
 class OurStationOut(BaseModel):
     id: int
     name: str
@@ -42,11 +34,6 @@ class OurStationOut(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-# --------------------------------------------------
-# 1️⃣ СПИСОК НАШИХ АЗС
-# --------------------------------------------------
 
 @router.get("/", response_model=List[OurStationOut])
 def get_our_stations(db: Session = Depends(get_db)):
@@ -89,11 +76,6 @@ def get_our_stations(db: Session = Depends(get_db)):
 
     return result
 
-
-# --------------------------------------------------
-# 2️⃣ ДЕТАЛИ ОДНОЙ НАШЕЙ АЗС
-# --------------------------------------------------
-
 @router.get("/{station_id}", response_model=OurStationOut)
 def station_details(station_id: int, db: Session = Depends(get_db)):
     st = db.query(OurStation).filter_by(id=station_id).first()
@@ -127,11 +109,6 @@ def station_details(station_id: int, db: Session = Depends(get_db)):
         city_name=st.city.name,
         latest_prices=prices
     )
-
-
-# --------------------------------------------------
-# 3️⃣ КОНКУРЕНТЫ В ГОРОДЕ + их последние цены
-# --------------------------------------------------
 
 @router.get("/{station_id}/competitors")
 def get_competitors_for_our(station_id: int, db: Session = Depends(get_db)):
@@ -181,10 +158,6 @@ def get_competitors_for_our(station_id: int, db: Session = Depends(get_db)):
 
     return result
 
-
-# --------------------------------------------------
-# 4️⃣ ИСТОРИЯ ЦЕН В НУЖНОМ ДЛЯ ФРОНТА ФОРМАТЕ
-# --------------------------------------------------
 
 @router.get("/{station_id}/history")
 def get_price_history(station_id: int, db: Session = Depends(get_db)):
@@ -242,10 +215,6 @@ def get_price_history(station_id: int, db: Session = Depends(get_db)):
     return list(history.values())
 
 
-
-# --------------------------------------------------
-# 5️⃣ СРЕДНЯЯ ЦЕНА ПО ГОРОДУ ДЛЯ ВЕРХНЕЙ ПЛАШКИ
-# --------------------------------------------------
 
 @router.get("/{station_id}/city-avg")
 def get_city_avg(station_id: int, db: Session = Depends(get_db)):

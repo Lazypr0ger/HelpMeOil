@@ -140,23 +140,23 @@ def run_full_parsing(db: Session, region: int = 46) -> pd.DataFrame:
         print("[WARN] Парсер вернул пустые данные.")
         return df
 
-    # ---------- 2. Чистим базовые поля ----------
+
     # удаляем строки без города или названия станции
     df = df.dropna(subset=["city", "station_name"])
 
-    # приводим город к строке и убираем лишние пробелы
+    
     df["city"] = df["city"].astype(str).str.strip()
     df["city"] = df["city"].apply(normalize_city)
 
-    # выкидываем строки, где city всё ещё выглядит как число (типа "60.3")
+
     mask_bad_city = df["city"].str.fullmatch(r"\d+([\.,]\d+)?")
     df = df[~mask_bad_city]
 
-    # приводим цену к числу, нули считаем отсутствующими
+    
     df["price"] = pd.to_numeric(df["price"], errors="coerce")
     df.loc[df["price"] <= 0, "price"] = pd.NA
 
-    # ---------- 3. Заполнение медианами по (city, fuel_code) ----------
+   
     def fill_group(group: pd.DataFrame) -> pd.DataFrame:
         median_price = group["price"].median()
         group["price"] = group["price"].fillna(median_price)
@@ -168,13 +168,10 @@ def run_full_parsing(db: Session, region: int = 46) -> pd.DataFrame:
         .reset_index(drop=True)
     )
 
-    # на всякий случай выбрасываем строки, где так и не удалось получить цену
     df = df.dropna(subset=["price"])
 
-    # ---------- 4. Сохраняем в history/ ----------
     save_dataframe_to_history(df)
 
-    # ---------- 5. Пишем в БД ----------
     write_to_database(df, db)
     generate_recommended_prices(db)
     return df

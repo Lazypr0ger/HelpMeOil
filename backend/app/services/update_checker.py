@@ -12,7 +12,7 @@ def need_update(db: Session, hours: int = 12) -> bool:
     last_record = db.query(FuelPrice).order_by(FuelPrice.date.desc()).first()
 
     if not last_record:
-        return True  # данных нет → надо парсить
+        return True  
 
     last_time = last_record.date
 

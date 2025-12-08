@@ -1,4 +1,4 @@
-// frontend/station.js
+
 console.log("STATION JS LOADED");
 let chartHistory = null;
 
@@ -18,7 +18,6 @@ function getId() {
     return new URLSearchParams(location.search).get("id");
 }
 
-/* ------------------ ОСНОВНАЯ ИНФОРМАЦИЯ ------------------ */
 
 async function loadStation(id) {
     const name = document.getElementById("stationName");
@@ -34,7 +33,6 @@ async function loadStation(id) {
     }
 }
 
-/* ------------------ РЕКОМЕНДУЕМЫЕ ------------------ */
 
 async function loadRecommended(id) {
     const box = document.getElementById("recommendedPrices");
@@ -60,7 +58,7 @@ async function loadRecommended(id) {
     }
 }
 
-/* ------------------ КОНКУРЕНТЫ ------------------ */
+
 
 async function loadCompetitors(id) {
     const tbody = document.querySelector("#competitorsTable tbody");
@@ -84,7 +82,6 @@ async function loadCompetitors(id) {
     }
 }
 
-/* ------------------ ГРАФИК ------------------ */
 
 async function loadPriceHistory(id) {
     const canvas = document.getElementById("priceHistoryChart");
@@ -96,7 +93,7 @@ async function loadPriceHistory(id) {
 
         const fuels = ["AI92", "AI95", "DIESEL", "GAS"];
 
-        // 🧹 Уничтожаем старый график
+
         if (chartHistory) chartHistory.destroy();
 
         chartHistory = new Chart(canvas, {
@@ -128,7 +125,6 @@ async function loadPriceHistory(id) {
 }
 
 
-/* ------------------ ДОПОЛНИТЕЛЬНОЕ ------------------ */
 
 async function loadRecommendedHistory(id) {
     console.log("recommended history:", await apiGet(`/our-stations/${id}/recommended/history`));

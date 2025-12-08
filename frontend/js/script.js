@@ -12,9 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
     loadMarketAnalytics();
 });
 
-/* ------------------------------------------------------------------------
-    СПИННЕРЫ (С БЕЗОПАСНОЙ ПРОВЕРКОЙ ЧТО ЭЛЕМЕНТ СУЩЕСТВУЕТ)
------------------------------------------------------------------------- */
+
 
 function showLoading() {
     const sOver = document.getElementById("stationsOverlay");
@@ -50,9 +48,7 @@ function hideLoading() {
     }
 }
 
-/* ------------------------------------------------------------------------
-    ЗАГРУЗКА СПИСКА НАШИХ АЗС
------------------------------------------------------------------------- */
+
 
 async function loadStations() {
     const container = document.getElementById("stationsContainer");
@@ -98,9 +94,6 @@ async function loadStations() {
     }
 }
 
-/* ------------------------------------------------------------------------
-    ЗАГРУЗКА АНАЛИТИКИ
------------------------------------------------------------------------- */
 
 async function loadMarketAnalytics() {
     const avgCanvas = document.getElementById("marketAvgChart");
@@ -113,11 +106,10 @@ async function loadMarketAnalytics() {
 
         const fuels = ["AI92", "AI95", "DIESEL", "GAS"];
 
-        // 🧹 Уничтожаем старые графики
         if (chartAvg) chartAvg.destroy();
         if (chartDyn) chartDyn.destroy();
 
-        // 📊 Создаём новый график №1
+
         chartAvg = new Chart(avgCanvas, {
             type: "bar",
             data: {
@@ -130,7 +122,7 @@ async function loadMarketAnalytics() {
             options: chartOptions
         });
 
-        // 📈 Новый график №2
+        
         chartDyn = new Chart(dynCanvas, {
             type: "line",
             data: {
@@ -159,9 +151,7 @@ const chartOptions = {
     }
 };
 
-/* ------------------------------------------------------------------------
-    КНОПКА "ОБНОВИТЬ ДАННЫЕ"
------------------------------------------------------------------------- */
+
 
 async function onForceUpdateClick() {
     const btn = document.getElementById("forceUpdateBtn");

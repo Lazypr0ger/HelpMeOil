@@ -55,8 +55,6 @@ class CompetitorStationDetail(BaseModel):
         from_attributes = True
 
 
-# ===== ENDPOINTS =====
-
 @router.get("/cities", response_model=List[CityOut])
 def get_cities(db: Session = Depends(get_db)):
     return db.query(City).order_by(City.name).all()
